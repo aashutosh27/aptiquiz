@@ -207,6 +207,7 @@ export class Room {
         userId: p.userId,
         displayName: p.displayName,
         score: p.score,
+        warningCount: p.warningCount || 0,
         status: p.status,
       })),
     };

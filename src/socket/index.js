@@ -135,16 +135,24 @@ export function setupSocketIO(server) {
 
     // --- ROOM REJOIN ---
     socket.on('room:rejoin', safeHandle('room:rejoin', async (payload, callback) => {
-      const roomId = payload?.roomId;
-      const room = roomManager.findRoomById(roomId);
+      let room = null;
+      if (payload?.roomId) room = roomManager.findRoomById(payload.roomId);
+      else if (payload?.pin) room = roomManager.findRoomByPin(payload.pin);
+
       if (!room) throw new AppError('ROOM_NOT_FOUND');
 
-      const existingPlayer = room.players.get(socket.user.id);
-      if (!existingPlayer) throw new AppError('ROOM_NOT_FOUND');
-      if (existingPlayer.status === 'disqualified') throw new AppError('DISQUALIFIED');
+      const isHost = Number(room.hostId) === Number(socket.user.id) || socket.user.role === 'host';
+      const existingPlayer = room.getPlayer(socket.user.id);
 
-      existingPlayer.socketId = socket.id;
-      existingPlayer.status = 'active';
+      if (!isHost && !isProctor && !socket.isProctor && !existingPlayer) {
+        throw new AppError('ROOM_NOT_FOUND');
+      }
+
+      if (existingPlayer) {
+        if (existingPlayer.status === 'disqualified') throw new AppError('DISQUALIFIED');
+        existingPlayer.socketId = socket.id;
+        existingPlayer.status = 'active';
+      }
 
       currentRoom = room;
       socket.join(`room_${room.id}`);
