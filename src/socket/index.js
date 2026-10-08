@@ -251,10 +251,11 @@ export function setupSocketIO(server) {
       }
       if (!currentRoom) throw new AppError('ROOM_NOT_FOUND');
 
-      if (currentRoom.proctorCode.toUpperCase() === parsed.proctorCode.toUpperCase()) {
+      const isHost = Number(currentRoom.hostId) === Number(socket.user.id) || socket.user.role === 'host';
+      if (isHost || (parsed.proctorCode && currentRoom.proctorCode.toUpperCase() === parsed.proctorCode.toUpperCase())) {
         isProctor = true;
         socket.isProctor = true;
-        if (typeof callback === 'function') callback({ success: true });
+        if (typeof callback === 'function') callback({ success: true, isHost });
       } else {
         throw new AppError('NOT_ALLOWED', 'Invalid Proctor Code');
       }
