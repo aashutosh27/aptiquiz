@@ -252,7 +252,7 @@ export function setupSocketIO(server) {
       }
     }));
 
-    socket.on('proctor:warn_player', safeHandle('proctor:warn_player', async (payload) => {
+    socket.on('proctor:warn_player', safeHandle('proctor:warn_player', async (payload, callback) => {
       if (!currentRoom) throw new AppError('ROOM_NOT_FOUND');
       const isHost = Number(currentRoom.hostId) === Number(socket.user.id) || socket.user.role === 'host';
       if (!isHost && !isProctor) throw new AppError('NOT_ALLOWED');
@@ -284,35 +284,46 @@ export function setupSocketIO(server) {
         targetUserId: parsed.targetUserId,
         warningCount: result.warningCount,
         disqualified: result.disqualified,
+        reason: parsed.reason,
+        status: targetPlayer ? targetPlayer.status : (result.disqualified ? 'disqualified' : 'active'),
       });
+
+      if (typeof callback === 'function') callback({ success: true, result });
     }));
 
-    socket.on('proctor:revoke_warning', safeHandle('proctor:revoke_warning', async (payload) => {
+    socket.on('proctor:revoke_warning', safeHandle('proctor:revoke_warning', async (payload, callback) => {
       if (!currentRoom) throw new AppError('ROOM_NOT_FOUND');
-      const isHost = currentRoom.hostId === socket.user.id;
+      const isHost = Number(currentRoom.hostId) === Number(socket.user.id) || socket.user.role === 'host';
       if (!isHost && !isProctor) throw new AppError('NOT_ALLOWED');
 
-      const warningId = payload?.warningId;
+      const warningId = Number(payload?.warningId);
       let result;
       await currentRoom.queue.enqueue(async () => {
         result = currentRoom.revokeWarning(warningId);
       });
 
       io.to(`room_${currentRoom.id}`).emit('room:warning_revoked', result);
+      if (typeof callback === 'function') callback({ success: true, result });
     }));
 
-    socket.on('proctor:reinstate_player', safeHandle('proctor:reinstate_player', async (payload) => {
+    socket.on('proctor:reinstate_player', safeHandle('proctor:reinstate_player', async (payload, callback) => {
       if (!currentRoom) throw new AppError('ROOM_NOT_FOUND');
-      const isHost = currentRoom.hostId === socket.user.id;
+      const isHost = Number(currentRoom.hostId) === Number(socket.user.id) || socket.user.role === 'host';
       if (!isHost && !isProctor) throw new AppError('NOT_ALLOWED');
 
-      const targetUserId = payload?.targetUserId;
+      const targetUserId = Number(payload?.targetUserId);
       let result;
       await currentRoom.queue.enqueue(async () => {
         result = currentRoom.reinstatePlayer(targetUserId);
       });
 
-      io.to(`room_${currentRoom.id}`).emit('room:player_reinstated', result);
+      const targetPlayer = currentRoom.players.get(targetUserId);
+      io.to(`room_${currentRoom.id}`).emit('room:player_reinstated', {
+        targetUserId,
+        warningCount: result.warningCount,
+        status: targetPlayer ? targetPlayer.status : 'active',
+      });
+      if (typeof callback === 'function') callback({ success: true, result });
     }));
 
     socket.on('disconnect', () => {

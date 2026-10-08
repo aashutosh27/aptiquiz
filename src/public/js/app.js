@@ -171,7 +171,12 @@ class AptiApp {
 
     // Handle Socket events
     this.socket.on('room:state', (snapshot) => this.renderRoomState(snapshot));
-    this.socket.on('room:player_joined', () => this.refreshLobby());
+    this.socket.on('room:player_joined', () => this.refreshProctorRoster());
+    this.socket.on('room:player_left', () => this.refreshProctorRoster());
+    this.socket.on('room:warning_issued', (data) => this.handleWarningIssued(data));
+    this.socket.on('room:warning_revoked', () => this.refreshProctorRoster());
+    this.socket.on('room:player_reinstated', () => this.refreshProctorRoster());
+    this.socket.on('room:player_kicked', () => this.refreshProctorRoster());
     this.socket.on('game:question_start', (data) => this.renderQuestion(data));
     this.socket.on('game:answer_acknowledged', () => {
       document.getElementById('answer-locked-notice').classList.remove('hidden');
@@ -429,7 +434,21 @@ class AptiApp {
     document.getElementById('lobby-count').innerText = snapshot.players.length;
 
     playerList.innerHTML = snapshot.players
-      .map((p) => `<li class="py-1 text-sm font-medium text-slate-800 flex justify-between items-center"><span>${p.displayName}</span> ${p.status === 'disconnected' ? '<span class="text-xs text-amber-600">(Away)</span>' : ''}</li>`)
+      .map((p) => {
+        const isSelf = Number(p.userId) === Number(this.user?.id);
+        const hostBtn = (isHost && !isSelf) ? `
+          <div class="space-x-1 flex text-xs">
+            <button onclick="app.proctorWarn(${p.userId}, '${(p.displayName || '').replace(/'/g, "\\'")}')" class="px-1.5 py-0.5 border border-amber-300 text-amber-800 rounded hover:bg-amber-50">⚠️ Warn</button>
+            <button onclick="app.proctorKick(${p.userId}, '${(p.displayName || '').replace(/'/g, "\\'")}')" class="px-1.5 py-0.5 border border-red-200 text-red-600 rounded hover:bg-red-50">🚫 Kick</button>
+          </div>
+        ` : '';
+        return `
+          <li class="py-1.5 text-sm font-medium text-slate-800 flex justify-between items-center">
+            <span>${p.displayName} ${p.status === 'disconnected' ? '<span class="text-xs text-amber-600">(Away)</span>' : ''} ${p.status === 'disqualified' ? '<span class="text-xs text-red-600 font-bold">(Disqualified)</span>' : ''}</span>
+            ${hostBtn}
+          </li>
+        `;
+      })
       .join('');
   }
 
@@ -437,6 +456,10 @@ class AptiApp {
     this.currentRoom = snapshot;
     if (snapshot.status === 'LOBBY') {
       this.renderLobby(snapshot);
+    }
+    const proctorScreen = document.getElementById('screen-proctor');
+    if (proctorScreen && !proctorScreen.classList.contains('hidden')) {
+      this.renderProctorRoster();
     }
   }
 
@@ -506,12 +529,142 @@ class AptiApp {
     this.showScreen('proctor');
     document.getElementById('proctor-code-disp').innerText = code || 'PROCTOR';
 
-    if (pin && this.socket) {
-      this.socket.emit('room:join', { pin });
+    if (!this.socket) this.initSocket();
+
+    const targetPin = pin || (this.currentRoom ? this.currentRoom.pin : '');
+
+    if (targetPin && this.socket) {
+      this.socket.emit('room:join', { pin: targetPin }, (res) => {
+        if (res && res.success) {
+          this.currentRoom = res.snapshot;
+          this.renderProctorRoster();
+        }
+      });
       if (code) {
         this.socket.emit('proctor:auth', { proctorCode: code });
       }
     }
+  }
+
+  renderProctorRoster() {
+    const list = document.getElementById('proctor-player-list');
+    const countEl = document.getElementById('proctor-player-count');
+    if (!list) return;
+
+    if (!this.currentRoom || !this.currentRoom.players || this.currentRoom.players.length === 0) {
+      list.innerHTML = `<div class="p-4 text-center text-xs text-slate-400 italic">No players connected to this room.</div>`;
+      if (countEl) countEl.innerText = '0';
+      return;
+    }
+
+    const hostId = Number(this.currentRoom.hostId);
+    const players = this.currentRoom.players.filter(p => Number(p.userId) !== hostId);
+    if (countEl) countEl.innerText = players.length;
+
+    if (players.length === 0) {
+      list.innerHTML = `<div class="p-4 text-center text-xs text-slate-400 italic">No student players joined yet.</div>`;
+      return;
+    }
+
+    list.innerHTML = players.map(p => {
+      const isDisqualified = p.status === 'disqualified';
+      const warningCount = p.warningCount || 0;
+      
+      let badgeHtml = '';
+      if (isDisqualified) {
+        badgeHtml = `<span class="text-xs font-bold bg-rose-100 text-rose-800 px-2 py-0.5 rounded">🚫 Disqualified (3/3)</span>`;
+      } else if (warningCount > 0) {
+        badgeHtml = `<span class="text-xs font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded">⚠️ ${warningCount}/3 Warnings</span>`;
+      } else {
+        badgeHtml = `<span class="text-xs font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">✓ Clean (0/3)</span>`;
+      }
+
+      const actionsHtml = isDisqualified ? `
+        <button onclick="app.proctorReinstate(${p.userId})" class="btn-outline text-xs px-2 py-1 text-emerald-700 border-emerald-300 hover:bg-emerald-50">
+          🔄 Reinstate Player
+        </button>
+      ` : `
+        <button onclick="app.proctorWarn(${p.userId}, '${(p.displayName || '').replace(/'/g, "\\'")}')" class="btn-outline text-xs px-2 py-1 text-amber-800 border-amber-300 hover:bg-amber-50">
+          ⚠️ Warn Player
+        </button>
+        <button onclick="app.proctorKick(${p.userId}, '${(p.displayName || '').replace(/'/g, "\\'")}')" class="btn-outline text-xs px-2 py-1 text-rose-700 border-rose-300 hover:bg-rose-50">
+          🚫 Ban / Kick
+        </button>
+      `;
+
+      return `
+        <div class="p-3 flex items-center justify-between hover:bg-slate-50 text-xs">
+          <div class="space-y-1">
+            <div class="flex items-center space-x-2">
+              <span class="font-bold text-slate-900 text-sm">${p.displayName}</span>
+              ${badgeHtml}
+            </div>
+            <p class="text-slate-500 font-mono">User ID: ${p.userId} | Score: ${p.score || 0} pts ${p.status === 'disconnected' ? '| (Away)' : ''}</p>
+          </div>
+          <div class="flex items-center space-x-1.5">
+            ${actionsHtml}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  proctorWarn(targetUserId, displayName) {
+    const reasons = [
+      'Tab switching detected / Left test window',
+      'Multiple devices / Suspicious activity',
+      'Off-screen behavior / Unauthorized assistance',
+      'Other proctoring rule violation'
+    ];
+    const selected = prompt(`Select reason to warn ${displayName}:\n\n1. ${reasons[0]}\n2. ${reasons[1]}\n3. ${reasons[2]}\n4. ${reasons[3]}\n\nEnter number (1-4) or type custom reason:`, '1');
+
+    if (!selected) return;
+
+    let reason = reasons[0];
+    if (selected === '2') reason = reasons[1];
+    else if (selected === '3') reason = reasons[2];
+    else if (selected === '4') reason = reasons[3];
+    else if (selected.length > 2) reason = selected;
+
+    this.socket.emit('proctor:warn_player', { targetUserId, reason }, (res) => {
+      if (res && res.success) {
+        alert(`Warning issued to ${displayName}.`);
+        this.refreshProctorRoster();
+      } else if (res && res.error) {
+        this.showError(res.error.message || 'Failed to issue warning.');
+      }
+    });
+  }
+
+  proctorKick(targetUserId, displayName) {
+    if (!confirm(`Are you sure you want to BAN / KICK ${displayName} from the room?`)) return;
+
+    this.socket.emit('host:kick_player', { targetUserId });
+    alert(`${displayName} has been kicked from the room.`);
+    this.refreshProctorRoster();
+  }
+
+  proctorReinstate(targetUserId) {
+    this.socket.emit('proctor:reinstate_player', { targetUserId }, (res) => {
+      if (res && res.success) {
+        alert('Player has been reinstated to active state with 2 warnings.');
+        this.refreshProctorRoster();
+      } else if (res && res.error) {
+        this.showError(res.error.message || 'Failed to reinstate player.');
+      }
+    });
+  }
+
+  refreshProctorRoster() {
+    this.refreshLobby();
+    const proctorScreen = document.getElementById('screen-proctor');
+    if (proctorScreen && !proctorScreen.classList.contains('hidden')) {
+      this.renderProctorRoster();
+    }
+  }
+
+  handleWarningIssued(data) {
+    this.refreshProctorRoster();
   }
 
   renderQuestion(q) {

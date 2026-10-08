@@ -71,7 +71,7 @@ export const submitAnswerPayloadSchema = z.object({
 });
 
 export const warnPlayerPayloadSchema = z.object({
-  targetUserId: z.number().int().positive(),
+  targetUserId: z.coerce.number().int().positive(),
   reason: z.string().min(1, 'Reason is required.').max(200),
   customReasonText: z.string().max(100).optional(),
 });

@@ -508,13 +508,23 @@
       <!-- 10. PROCTOR / REFEREE PANEL DASHBOARD -->
       <section id="screen-proctor" class="hidden space-y-6">
         <div class="flex items-center justify-between border-b pb-3">
-          <h1 class="text-xl font-bold text-slate-900">Proctor & Referee Panel</h1>
-          <span class="text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded">Code: <span id="proctor-code-disp" class="font-mono font-bold"></span></span>
+          <div>
+            <h1 class="text-xl font-bold text-slate-900">🛡️ Proctor & Referee Control Panel</h1>
+            <p class="text-xs text-slate-500">Monitor live room players, issue anti-cheat warnings, ban or reinstate participants.</p>
+          </div>
+          <div class="flex items-center space-x-2">
+            <span class="text-xs bg-slate-100 text-slate-700 px-2.5 py-1 rounded border">Code: <span id="proctor-code-disp" class="font-mono font-bold"></span></span>
+            <button onclick="app.goToDashboard()" class="btn-outline text-xs px-2 py-1">Back</button>
+          </div>
         </div>
 
+        <!-- Roster & Action Controls -->
         <div class="space-y-3">
-          <h2 class="text-sm font-bold text-slate-700 uppercase">Live Player Roster</h2>
-          <div id="proctor-player-list" class="divide-y border rounded bg-white max-h-64 overflow-y-auto"></div>
+          <div class="flex justify-between items-center">
+            <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wide">Live Player Roster (<span id="proctor-player-count">0</span>)</h2>
+            <button onclick="app.refreshProctorRoster()" class="btn-outline text-xs px-2.5 py-1">🔄 Refresh Roster</button>
+          </div>
+          <div id="proctor-player-list" class="divide-y border rounded bg-white max-h-96 overflow-y-auto shadow-sm"></div>
         </div>
       </section>
 
