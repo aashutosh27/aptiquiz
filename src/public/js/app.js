@@ -172,12 +172,12 @@ class AptiApp {
 
     // Handle Socket events
     this.socket.on('room:state', (snapshot) => this.renderRoomState(snapshot));
-    this.socket.on('room:player_joined', () => this.refreshProctorRoster());
-    this.socket.on('room:player_left', () => this.refreshProctorRoster());
+    this.socket.on('room:player_joined', () => this.refreshRoomUI());
+    this.socket.on('room:player_left', () => this.refreshRoomUI());
     this.socket.on('room:warning_issued', (data) => this.handleWarningIssued(data));
-    this.socket.on('room:warning_revoked', () => this.refreshProctorRoster());
-    this.socket.on('room:player_reinstated', () => this.refreshProctorRoster());
-    this.socket.on('room:player_kicked', () => this.refreshProctorRoster());
+    this.socket.on('room:warning_revoked', () => this.refreshRoomUI());
+    this.socket.on('room:player_reinstated', () => this.refreshRoomUI());
+    this.socket.on('room:player_kicked', () => this.refreshRoomUI());
     this.socket.on('game:question_start', (data) => this.renderQuestion(data));
     this.socket.on('game:answer_acknowledged', () => {
       document.getElementById('answer-locked-notice').classList.remove('hidden');
@@ -419,8 +419,8 @@ class AptiApp {
   renderLobby(snapshot) {
     this.instructionsSeen = false;
     this.showScreen('lobby');
-    document.getElementById('lobby-pin').innerText = snapshot.pin;
-    const shareUrl = `${window.location.origin}/j/${snapshot.pin}`;
+    document.getElementById('lobby-pin').innerText = snapshot.pin || '------';
+    const shareUrl = `${window.location.origin}/j/${snapshot.inviteToken || snapshot.pin}`;
     const shareEl = document.getElementById('lobby-share-url');
     if (shareEl) shareEl.innerText = shareUrl;
 
@@ -446,26 +446,39 @@ class AptiApp {
       durationSelect.value = String(snapshot.questionDurationMs);
     }
 
-    const playerList = document.getElementById('lobby-player-list');
-    document.getElementById('lobby-count').innerText = snapshot.players.length;
+    const rawPlayers = snapshot.players
+      ? (Array.isArray(snapshot.players) ? snapshot.players : Array.from(snapshot.players.values ? snapshot.players.values() : []))
+      : [];
+    const hostId = Number(snapshot.hostId);
+    const nonHostPlayers = rawPlayers.filter((p) => Number(p.userId) !== hostId && p.status !== 'disqualified');
 
-    playerList.innerHTML = snapshot.players
-      .map((p) => {
-        const isSelf = Number(p.userId) === Number(this.user?.id);
-        const hostBtn = (isHost && !isSelf) ? `
-          <div class="space-x-1 flex text-xs">
-            <button onclick="app.proctorWarn(${p.userId}, '${(p.displayName || '').replace(/'/g, "\\'")}')" class="px-1.5 py-0.5 border border-amber-300 text-amber-800 rounded hover:bg-amber-50">⚠️ Warn</button>
-            <button onclick="app.proctorKick(${p.userId}, '${(p.displayName || '').replace(/'/g, "\\'")}')" class="px-1.5 py-0.5 border border-red-200 text-red-600 rounded hover:bg-red-50">🚫 Kick</button>
-          </div>
-        ` : '';
-        return `
-          <li class="py-1.5 text-sm font-medium text-slate-800 flex justify-between items-center">
-            <span>${p.displayName} ${p.status === 'disconnected' ? '<span class="text-xs text-amber-600">(Away)</span>' : ''} ${p.status === 'disqualified' ? '<span class="text-xs text-red-600 font-bold">(Disqualified)</span>' : ''}</span>
-            ${hostBtn}
-          </li>
-        `;
-      })
-      .join('');
+    const countEl = document.getElementById('lobby-count');
+    if (countEl) countEl.innerText = nonHostPlayers.length;
+
+    const playerList = document.getElementById('lobby-player-list');
+    if (playerList) {
+      if (nonHostPlayers.length === 0) {
+        playerList.innerHTML = `<li class="py-3 text-center text-xs text-slate-400 italic">Waiting for student players to join using PIN or link...</li>`;
+      } else {
+        playerList.innerHTML = nonHostPlayers
+          .map((p) => {
+            const isSelf = Number(p.userId) === Number(this.user?.id);
+            const hostBtn = (isHost && !isSelf) ? `
+              <div class="space-x-1 flex text-xs">
+                <button onclick="app.proctorWarn(${p.userId}, '${(p.displayName || '').replace(/'/g, "\\'")}')" class="px-1.5 py-0.5 border border-amber-300 text-amber-800 rounded hover:bg-amber-50">⚠️ Warn</button>
+                <button onclick="app.proctorKick(${p.userId}, '${(p.displayName || '').replace(/'/g, "\\'")}')" class="px-1.5 py-0.5 border border-red-200 text-red-600 rounded hover:bg-red-50">🚫 Kick</button>
+              </div>
+            ` : '';
+            return `
+              <li class="py-1.5 text-sm font-medium text-slate-800 flex justify-between items-center">
+                <span>${p.displayName} ${p.status === 'disconnected' ? '<span class="text-xs text-amber-600">(Away)</span>' : ''} ${p.status === 'disqualified' ? '<span class="text-xs text-red-600 font-bold">(Disqualified)</span>' : ''}</span>
+                ${hostBtn}
+              </li>
+            `;
+          })
+          .join('');
+      }
+    }
   }
 
   renderRoomState(snapshot) {
@@ -474,16 +487,10 @@ class AptiApp {
     if (existingCode && !this.currentRoom.proctorCode) {
       this.currentRoom.proctorCode = existingCode;
     }
-    if (snapshot.status === 'LOBBY') {
-      this.renderLobby(snapshot);
-    }
-    const proctorScreen = document.getElementById('screen-proctor');
-    if (proctorScreen && !proctorScreen.classList.contains('hidden')) {
-      this.renderProctorRoster();
-    }
+    this.updateActiveScreenUI();
   }
 
-  refreshLobby() {
+  refreshRoomUI() {
     if (this.currentRoom) {
       const roomId = this.currentRoom.roomId || this.currentRoom.id;
       const pin = this.currentRoom.pin;
@@ -494,13 +501,37 @@ class AptiApp {
           if (existingCode && !this.currentRoom.proctorCode) {
             this.currentRoom.proctorCode = existingCode;
           }
-          const proctorScreen = document.getElementById('screen-proctor');
-          if (proctorScreen && !proctorScreen.classList.contains('hidden')) {
-            this.renderProctorRoster();
-          }
+          this.updateActiveScreenUI();
         }
       });
     }
+  }
+
+  updateActiveScreenUI() {
+    if (!this.currentRoom) return;
+
+    const lobbyScreen = document.getElementById('screen-lobby');
+    if (lobbyScreen && !lobbyScreen.classList.contains('hidden')) {
+      this.renderLobby(this.currentRoom);
+    }
+
+    const proctorScreen = document.getElementById('screen-proctor');
+    if (proctorScreen && !proctorScreen.classList.contains('hidden')) {
+      this.renderProctorRoster();
+    }
+
+    const hostLiveScreen = document.getElementById('screen-host-live');
+    if (hostLiveScreen && !hostLiveScreen.classList.contains('hidden')) {
+      this.updateHostLiveStats();
+    }
+  }
+
+  refreshLobby() {
+    this.refreshRoomUI();
+  }
+
+  refreshProctorRoster() {
+    this.refreshRoomUI();
   }
 
   hostStartGame() {

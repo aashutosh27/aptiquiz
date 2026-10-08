@@ -166,10 +166,12 @@ app.post('/api/rooms', (req, res, next) => {
       room: {
         id: room.id,
         pin: room.pin,
+        hostId: room.hostId,
         inviteToken: room.inviteToken,
         joinUrl: `${config.PUBLIC_BASE_URL}/j/${room.inviteToken}`,
         proctorCode: room.proctorCode,
         settings: room.settings,
+        players: [],
       },
     });
   } catch (err) {
