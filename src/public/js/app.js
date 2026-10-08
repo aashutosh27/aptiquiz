@@ -213,10 +213,15 @@ class AptiApp {
 
   addCustomQuestion() {
     const text = document.getElementById('new-q-text').value.trim();
+    const qImage = document.getElementById('new-q-image')?.value.trim() || '';
     const optA = document.getElementById('new-opt-a').value.trim();
+    const optAImg = document.getElementById('new-opt-a-img')?.value.trim() || '';
     const optB = document.getElementById('new-opt-b').value.trim();
+    const optBImg = document.getElementById('new-opt-b-img')?.value.trim() || '';
     const optC = document.getElementById('new-opt-c').value.trim();
+    const optCImg = document.getElementById('new-opt-c-img')?.value.trim() || '';
     const optD = document.getElementById('new-opt-d').value.trim();
+    const optDImg = document.getElementById('new-opt-d-img')?.value.trim() || '';
     const correct = document.getElementById('new-correct-opt').value;
     const explanation = document.getElementById('new-explanation').value.trim();
     const topic = document.getElementById('set-topic').value;
@@ -233,15 +238,16 @@ class AptiApp {
     }
 
     const options = [
-      { id: 'A', text: optA },
-      { id: 'B', text: optB },
+      { id: 'A', text: optA, image_url: optAImg || undefined },
+      { id: 'B', text: optB, image_url: optBImg || undefined },
     ];
-    if (optC) options.push({ id: 'C', text: optC });
-    if (optD) options.push({ id: 'D', text: optD });
+    if (optC) options.push({ id: 'C', text: optC, image_url: optCImg || undefined });
+    if (optD) options.push({ id: 'D', text: optD, image_url: optDImg || undefined });
 
     const newQuestion = {
       id: this.customQuestionsList.length + 1,
       text,
+      image_url: qImage || undefined,
       options,
       correct_option_id: correct,
       topic,
@@ -253,10 +259,15 @@ class AptiApp {
 
     // Clear input fields
     document.getElementById('new-q-text').value = '';
+    if (document.getElementById('new-q-image')) document.getElementById('new-q-image').value = '';
     document.getElementById('new-opt-a').value = '';
+    if (document.getElementById('new-opt-a-img')) document.getElementById('new-opt-a-img').value = '';
     document.getElementById('new-opt-b').value = '';
+    if (document.getElementById('new-opt-b-img')) document.getElementById('new-opt-b-img').value = '';
     document.getElementById('new-opt-c').value = '';
+    if (document.getElementById('new-opt-c-img')) document.getElementById('new-opt-c-img').value = '';
     document.getElementById('new-opt-d').value = '';
+    if (document.getElementById('new-opt-d-img')) document.getElementById('new-opt-d-img').value = '';
     document.getElementById('new-explanation').value = '';
 
     this.renderEditorQuestions();
@@ -537,6 +548,15 @@ class AptiApp {
     if (qText) qText.innerText = q.text || '';
     if (topicBadge) topicBadge.innerText = q.topic || 'Quantitative';
 
+    const hostImgContainer = document.getElementById('host-live-q-image-container');
+    const hostImg = document.getElementById('host-live-q-image');
+    if (q.image_url && hostImgContainer && hostImg) {
+      hostImg.src = q.image_url;
+      hostImgContainer.classList.remove('hidden');
+    } else if (hostImgContainer) {
+      hostImgContainer.classList.add('hidden');
+    }
+
     this.startHostCountdown(q.durationMs || 15000);
     this.updateHostLiveStats();
   }
@@ -678,6 +698,15 @@ class AptiApp {
     document.querySelectorAll('#q-total').forEach(el => el.innerText = q.totalQuestions || 10);
     document.getElementById('q-text').innerText = q.text;
 
+    const qImgContainer = document.getElementById('q-image-container');
+    const qImg = document.getElementById('q-image');
+    if (q.image_url && qImgContainer && qImg) {
+      qImg.src = q.image_url;
+      qImgContainer.classList.remove('hidden');
+    } else if (qImgContainer) {
+      qImgContainer.classList.add('hidden');
+    }
+
     const scoreBox = document.getElementById('player-score-box');
     if (scoreBox) scoreBox.innerText = `${this.userScore || 0} pts`;
 
@@ -689,12 +718,19 @@ class AptiApp {
       const shapeInfo = this.shapes[letter] || this.shapes['A'];
 
       const btn = document.createElement('button');
-      btn.className = 'option-btn';
+      btn.className = 'option-btn flex-col items-start text-left';
       btn.onclick = () => this.submitAnswer(q.questionId, opt.id, btn);
 
+      const optImgHtml = opt.image_url
+        ? `<img src="${opt.image_url}" alt="Option Image" class="max-h-24 max-w-full rounded border mt-2 object-contain">`
+        : '';
+
       btn.innerHTML = `
-        <span class="option-shape ${shapeInfo.class}"><span>${shapeInfo.symbol}</span></span>
-        <span>${opt.text}</span>
+        <div class="flex items-center space-x-2">
+          <span class="option-shape ${shapeInfo.class}"><span>${shapeInfo.symbol}</span></span>
+          <span class="font-medium text-slate-900">${opt.text}</span>
+        </div>
+        ${optImgHtml}
       `;
       optionsContainer.appendChild(btn);
     });

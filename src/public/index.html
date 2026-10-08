@@ -224,12 +224,25 @@
           <h2 class="font-bold text-sm text-slate-800 uppercase">+ Add Question</h2>
           
           <textarea id="new-q-text" rows="2" placeholder="Enter question text" class="w-full border border-slate-300 p-2 rounded text-sm"></textarea>
+          <input id="new-q-image" type="url" placeholder="Question Image URL (optional, e.g. https://...)" class="w-full border border-slate-300 p-2 rounded text-sm">
           
           <div class="grid grid-cols-2 gap-2">
-            <input id="new-opt-a" type="text" placeholder="Option A" class="border border-slate-300 p-2 rounded text-sm">
-            <input id="new-opt-b" type="text" placeholder="Option B" class="border border-slate-300 p-2 rounded text-sm">
-            <input id="new-opt-c" type="text" placeholder="Option C" class="border border-slate-300 p-2 rounded text-sm">
-            <input id="new-opt-d" type="text" placeholder="Option D" class="border border-slate-300 p-2 rounded text-sm">
+            <div class="space-y-1">
+              <input id="new-opt-a" type="text" placeholder="Option A Text" class="w-full border border-slate-300 p-2 rounded text-sm">
+              <input id="new-opt-a-img" type="url" placeholder="Option A Image URL (optional)" class="w-full border border-slate-200 p-1.5 rounded text-xs">
+            </div>
+            <div class="space-y-1">
+              <input id="new-opt-b" type="text" placeholder="Option B Text" class="w-full border border-slate-300 p-2 rounded text-sm">
+              <input id="new-opt-b-img" type="url" placeholder="Option B Image URL (optional)" class="w-full border border-slate-200 p-1.5 rounded text-xs">
+            </div>
+            <div class="space-y-1">
+              <input id="new-opt-c" type="text" placeholder="Option C Text" class="w-full border border-slate-300 p-2 rounded text-sm">
+              <input id="new-opt-c-img" type="url" placeholder="Option C Image URL (optional)" class="w-full border border-slate-200 p-1.5 rounded text-xs">
+            </div>
+            <div class="space-y-1">
+              <input id="new-opt-d" type="text" placeholder="Option D Text" class="w-full border border-slate-300 p-2 rounded text-sm">
+              <input id="new-opt-d-img" type="url" placeholder="Option D Image URL (optional)" class="w-full border border-slate-200 p-1.5 rounded text-xs">
+            </div>
           </div>
 
           <div class="grid grid-cols-2 gap-2 items-center">
@@ -317,10 +330,7 @@
           <p id="lobby-share-url" class="text-xs font-mono text-slate-600 truncate"></p>
         </div>
 
-        <!-- Large QR Code for projection -->
-        <div class="flex flex-col items-center justify-center my-2">
-          <div id="lobby-qrcode" class="hidden p-2 bg-white border border-slate-300 rounded"></div>
-        </div>
+        <!-- Session PIN & Link Container -->
 
         <!-- Separate Dashboard Sharing URLs for Host -->
         <div id="host-controls" class="hidden space-y-3 bg-slate-50 p-4 rounded border text-left">
@@ -450,6 +460,9 @@
             </div>
 
             <h2 id="q-text" class="text-lg font-bold text-slate-900"></h2>
+            <div id="q-image-container" class="hidden my-2 max-h-64 flex justify-center overflow-hidden rounded border">
+              <img id="q-image" src="" alt="Question Image" class="max-h-64 object-contain">
+            </div>
 
             <!-- Colorblind-safe options (Square, Circle, Triangle, Diamond) -->
             <div id="options-container" class="space-y-3"></div>
@@ -485,10 +498,6 @@
           <p class="text-xs uppercase tracking-widest font-semibold text-blue-200">Spectator / Hall View</p>
           <p id="spec-pin" class="text-6xl font-mono font-bold tracking-widest my-3"></p>
           <p id="spec-link" class="text-sm font-mono text-blue-200"></p>
-        </div>
-
-        <div class="flex justify-center my-4">
-          <div id="spec-qrcode" class="p-3 bg-white border border-slate-300 rounded shadow-sm"></div>
         </div>
 
         <div id="spec-live-content" class="space-y-4 text-left">
@@ -621,6 +630,9 @@
         <!-- Live Question Info & Answer Progress -->
         <div class="bg-white p-4 border border-slate-300 rounded-lg space-y-3 shadow-sm">
           <p id="host-live-q-text" class="font-bold text-slate-900 text-sm"></p>
+          <div id="host-live-q-image-container" class="hidden my-2 max-h-48 flex justify-center overflow-hidden rounded border">
+            <img id="host-live-q-image" src="" alt="Question Image" class="max-h-48 object-contain">
+          </div>
           <div class="flex items-center justify-between text-xs text-slate-600 bg-slate-50 p-2.5 rounded border">
             <span>Progress: <strong id="host-live-answered-count" class="text-slate-900">0</strong> / <strong id="host-live-total-players" class="text-slate-900">0</strong> Players Answered</span>
             <span id="host-live-topic-badge" class="font-mono uppercase text-blue-900 font-semibold bg-blue-50 px-2 py-0.5 rounded border border-blue-200"></span>

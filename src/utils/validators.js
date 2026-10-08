@@ -1,9 +1,10 @@
 import { z } from 'zod';
 
-// Option schema
+// Option schema with image_url support
 export const optionSchema = z.object({
   id: z.string().min(1),
-  text: z.string().min(1, 'Option text cannot be empty').max(200, 'Option text too long'),
+  text: z.string().min(1, 'Option text cannot be empty').max(500, 'Option text too long'),
+  image_url: z.string().url().optional().or(z.literal('')),
 });
 
 // Single Question Schema
