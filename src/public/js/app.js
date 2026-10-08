@@ -46,8 +46,10 @@ class AptiApp {
     }
 
     if (this.pendingToken) {
-      const pinInput = document.getElementById('join-pin');
-      if (pinInput) pinInput.value = this.pendingToken;
+      const input1 = document.getElementById('input-pin');
+      const input2 = document.getElementById('join-pin');
+      if (input1) input1.value = this.pendingToken;
+      if (input2) input2.value = this.pendingToken;
       if (this.user) {
         this.handleInviteLink(this.pendingToken);
       } else {
@@ -330,12 +332,15 @@ class AptiApp {
     }
   }
 
-  async joinRoom() {
-    const pin = document.getElementById('join-pin').value.trim();
+  joinByPin() {
+    const pinInput = document.getElementById('input-pin') || document.getElementById('join-pin');
+    const pin = pinInput ? pinInput.value.trim() : '';
     if (!pin || pin.length !== 6) {
       this.showError('Enter a valid 6-digit PIN.');
       return;
     }
+
+    if (!this.socket) this.initSocket();
 
     this.socket.emit('room:join', { pin }, (response) => {
       if (response && response.success) {
@@ -346,9 +351,13 @@ class AptiApp {
           this.showScreen('question');
         }
       } else {
-        this.showError(response?.error?.message || 'Failed to join room.');
+        this.showError(response?.error?.message || 'Failed to join room. Check the 6-digit PIN.');
       }
     });
+  }
+
+  joinRoom() {
+    return this.joinByPin();
   }
 
   handleInviteLink(token) {
