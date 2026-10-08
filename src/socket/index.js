@@ -242,10 +242,17 @@ export function setupSocketIO(server) {
     // --- PROCTOR ACTIONS ---
     socket.on('proctor:auth', safeHandle('proctor:auth', async (payload, callback) => {
       const parsed = proctorAuthPayloadSchema.parse(payload);
+      if (!currentRoom && parsed.pin) {
+        currentRoom = roomManager.findRoomByPin(parsed.pin);
+        if (currentRoom) {
+          socket.join(`room_${currentRoom.id}`);
+        }
+      }
       if (!currentRoom) throw new AppError('ROOM_NOT_FOUND');
 
       if (currentRoom.proctorCode.toUpperCase() === parsed.proctorCode.toUpperCase()) {
         isProctor = true;
+        socket.isProctor = true;
         if (typeof callback === 'function') callback({ success: true });
       } else {
         throw new AppError('NOT_ALLOWED', 'Invalid Proctor Code');

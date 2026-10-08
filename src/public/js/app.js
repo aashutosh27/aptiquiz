@@ -527,22 +527,55 @@ class AptiApp {
   // --- PROCTOR / REFEREE DASHBOARD ---
   openProctorMode(pin, code) {
     this.showScreen('proctor');
-    document.getElementById('proctor-code-disp').innerText = code || 'PROCTOR';
+
+    let targetPin = pin || (this.currentRoom ? this.currentRoom.pin : '');
+    let targetCode = code || (this.currentRoom ? this.currentRoom.proctorCode : '');
+
+    if (!targetPin) {
+      targetPin = prompt('Enter 6-Digit Room PIN:');
+      if (!targetPin) {
+        this.showScreen('join');
+        return;
+      }
+    }
+
+    if (!targetCode) {
+      targetCode = prompt('Enter Referee / Proctor Code:');
+      if (!targetCode) {
+        this.showScreen('join');
+        return;
+      }
+    }
+
+    document.getElementById('proctor-code-disp').innerText = targetCode.trim();
 
     if (!this.socket) this.initSocket();
 
-    const targetPin = pin || (this.currentRoom ? this.currentRoom.pin : '');
-
-    if (targetPin && this.socket) {
-      this.socket.emit('room:join', { pin: targetPin }, (res) => {
-        if (res && res.success) {
-          this.currentRoom = res.snapshot;
+    const executeAuthAndJoin = () => {
+      this.socket.emit('room:join', { pin: targetPin.trim() }, (joinRes) => {
+        if (joinRes && joinRes.success) {
+          this.currentRoom = joinRes.snapshot;
           this.renderProctorRoster();
+
+          this.socket.emit('proctor:auth', { proctorCode: targetCode.trim(), pin: targetPin.trim() }, (authRes) => {
+            if (authRes && authRes.success) {
+              console.log('Referee / Proctor authenticated successfully.');
+            } else {
+              this.showError(authRes?.error?.message || 'Invalid Proctor Code');
+            }
+          });
+        } else {
+          this.showError(joinRes?.error?.message || 'Failed to join room as Referee.');
         }
       });
-      if (code) {
-        this.socket.emit('proctor:auth', { proctorCode: code });
-      }
+    };
+
+    if (this.socket.connected) {
+      executeAuthAndJoin();
+    } else {
+      this.socket.once('connect', () => {
+        executeAuthAndJoin();
+      });
     }
   }
 

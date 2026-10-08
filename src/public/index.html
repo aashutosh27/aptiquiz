@@ -82,8 +82,10 @@
           <button onclick="app.joinByPin()" class="btn-navy w-full text-lg">Join Quiz</button>
         </div>
 
-        <div class="text-center pt-2">
-          <button onclick="app.createNewRoom()" class="text-sm font-semibold text-blue-900 hover:underline">+ Host a Room (Create Quiz)</button>
+        <div class="text-center pt-2 flex justify-center items-center space-x-3 text-xs font-semibold">
+          <button onclick="app.createNewRoom()" class="text-blue-900 hover:underline">+ Host a Room (Create Quiz)</button>
+          <span class="text-slate-400">•</span>
+          <button onclick="app.openProctorMode()" class="text-indigo-900 hover:underline">🛡️ Referee / Proctor Mode</button>
         </div>
 
         <p class="text-xs text-center text-slate-500">
