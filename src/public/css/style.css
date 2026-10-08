@@ -1,0 +1,129 @@
+/* AptiQuiz Sober Professional Stylesheet */
+:root {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --navy-accent: #1e3a8a;
+  --navy-hover: #1e40af;
+  --border-color: #cbd5e1;
+  --font-base: 16px;
+}
+
+body.large-text {
+  --font-base: 20px;
+  font-size: 20px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  line-height: 1.5;
+  margin: 0;
+  padding: 0;
+}
+
+/* Touch targets min 48px */
+button, input, select {
+  min-height: 48px;
+  font-size: 1rem;
+}
+
+.btn-navy {
+  background-color: var(--navy-accent);
+  color: #ffffff;
+  border-radius: 6px;
+  font-weight: 600;
+  padding: 12px 24px;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.btn-navy:hover {
+  background-color: var(--navy-hover);
+}
+
+.btn-outline {
+  background-color: transparent;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-weight: 500;
+  padding: 12px 24px;
+  cursor: pointer;
+}
+
+.btn-outline:hover {
+  background-color: #f1f5f9;
+}
+
+/* Color-blind safe option buttons */
+.option-btn {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 16px;
+  min-height: 64px;
+  background-color: #ffffff;
+  border: 2px solid #cbd5e1;
+  border-radius: 8px;
+  text-align: left;
+  font-size: 1.125rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.option-btn:hover {
+  border-color: var(--navy-accent);
+  background-color: #f8fafc;
+}
+
+.option-btn.selected {
+  border-color: var(--navy-accent);
+  background-color: #eff6ff;
+  font-weight: 700;
+}
+
+.option-shape {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  margin-right: 16px;
+  background-color: #0f172a;
+  color: #ffffff;
+  font-weight: bold;
+  border-radius: 4px;
+}
+
+.shape-sq { border-radius: 4px; }
+.shape-ci { border-radius: 50%; }
+.shape-tr { clip-path: polygon(50% 0%, 0% 100%, 100% 100%); }
+.shape-di { transform: rotate(45deg); }
+.shape-di span { transform: rotate(-45deg); }
+
+/* Dividers */
+.divider {
+  border-top: 1px solid var(--border-color);
+  margin: 24px 0;
+}
+
+/* Notice banner */
+.notice-box {
+  background-color: #f8fafc;
+  border-left: 4px solid var(--navy-accent);
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.error-banner {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  padding: 12px 16px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}

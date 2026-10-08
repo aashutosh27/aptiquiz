@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AptiQuiz - Real-Time Multiplayer Aptitude Quiz</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/qrcode.min.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
+
+  <!-- Top Navigation Bar -->
+  <header class="bg-white border-b border-slate-200 px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center space-x-3">
+      <a href="/" class="text-xl font-bold tracking-tight text-blue-950">AptiQuiz</a>
+      <span id="user-badge" class="hidden text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded"></span>
+    </div>
+
+    <!-- Accessibility Toggles & Menu -->
+    <div class="flex items-center space-x-2 text-sm">
+      <button id="btn-dashboard" onclick="app.goToDashboard()" class="px-2 py-1 bg-blue-900 text-white font-semibold rounded hover:bg-blue-950 text-xs">🏠 Dashboard</button>
+      <button id="btn-text-toggle" onclick="app.toggleLargeText()" class="px-2 py-1 border border-slate-300 rounded hover:bg-slate-100 text-xs">Aa Text</button>
+      <button id="btn-sound-toggle" onclick="app.toggleSound()" class="px-2 py-1 border border-slate-300 rounded hover:bg-slate-100 text-xs">Sound: ON</button>
+      <a href="#league" onclick="app.showScreen('league')" class="text-blue-900 hover:underline px-2 py-1 font-medium text-xs">League</a>
+      <button id="btn-logout" onclick="app.logout()" class="hidden text-red-600 hover:underline px-2 py-1 text-xs">Sign Out</button>
+    </div>
+  </header>
+
+  <!-- Global Offline / Connection Warning Banner -->
+  <div id="offline-banner" class="hidden bg-amber-500 text-white text-center py-2 text-sm font-semibold">
+    Weak or Offline Connection. Reconnecting...
+  </div>
+
+  <!-- Global Error Notice Container -->
+  <div id="error-container" class="max-w-md mx-auto mt-4 px-4 w-full"></div>
+
+  <!-- Main Content Area -->
+  <main class="flex-grow flex items-center justify-center p-4">
+    <div class="w-full max-w-xl bg-white border border-slate-200 rounded-lg p-6 shadow-sm">
+
+      <!-- 1. SIGN IN SCREEN -->
+      <section id="screen-signin" class="space-y-6 text-center">
+        <h1 class="text-2xl font-bold text-slate-900">Sign in to AptiQuiz</h1>
+        <p class="text-slate-600 text-sm">Race through real-time aptitude & logical reasoning questions.</p>
+        
+        <div class="flex justify-center my-6">
+          <div id="google-signin-btn"></div>
+        </div>
+
+        <div class="divider"></div>
+        
+        <!-- Dev / Test Sign-in fallback -->
+        <div class="bg-slate-50 p-4 border border-slate-200 rounded text-left space-y-3">
+          <p class="text-xs font-semibold text-slate-500 uppercase">Quick Sign In</p>
+          <input id="quick-name" type="text" placeholder="Enter your display name" class="w-full border border-slate-300 p-2 rounded">
+          <div class="flex space-x-2">
+            <button onclick="app.quickSignIn('player')" class="btn-navy w-1/2 text-sm">Sign in as Student</button>
+            <button onclick="app.quickSignIn('host')" class="btn-outline w-1/2 text-sm">Sign in as Host</button>
+          </div>
+        </div>
+
+        <p class="text-xs text-slate-500 mt-4">
+          Privacy Notice: We store your Google ID and Display Name to count quiz results for your college league. Your email is never shown publicly.
+        </p>
+      </section>
+
+      <!-- 2. JOIN SCREEN (PIN or LINK) -->
+      <section id="screen-join" class="hidden space-y-6">
+        <h1 class="text-2xl font-bold text-center text-slate-900">Join a Quiz Room</h1>
+        
+        <div id="link-info-box" class="hidden notice-box text-sm">
+          <p class="font-semibold text-blue-900" id="link-room-title"></p>
+          <p class="text-slate-600" id="link-host-name"></p>
+        </div>
+
+        <div class="space-y-4">
+          <label class="block text-sm font-medium text-slate-700">Enter 6-Digit Session PIN</label>
+          <input id="input-pin" type="pattern" inputmode="numeric" maxlength="6" placeholder="" class="w-full text-center text-3xl font-mono tracking-widest border border-slate-300 p-3 rounded focus:outline-none focus:border-blue-900">
+          <button onclick="app.joinByPin()" class="btn-navy w-full text-lg">Join Quiz</button>
+        </div>
+
+        <div class="text-center pt-2">
+          <button onclick="app.createNewRoom()" class="text-sm font-semibold text-blue-900 hover:underline">+ Host a Room (Create Quiz)</button>
+        </div>
+
+        <p class="text-xs text-center text-slate-500">
+          Have a share link? Open it from your message or scan the QR code.
+        </p>
+
+        <div class="divider"></div>
+
+        <div class="bg-slate-50 p-4 border border-slate-200 rounded text-xs space-y-2">
+          <p class="font-bold text-slate-700">Scoring Rules:</p>
+          <p>• Points = round(1000 - 500 * (t / T)), where t is response speed in ms.</p>
+          <p>• Instant answer: ~1000 pts. Answer at deadline: 500 pts. Wrong/missed: 0 pts.</p>
+          <p>• Worked Example: Answering in 3.0s on a 15s question earns round(1000 - 500*(3/15)) = 900 points.</p>
+        </div>
+      </section>
+
+      <!-- 3. HOST DASHBOARD -->
+      <section id="screen-host-dashboard" class="hidden space-y-6">
+        <div class="flex items-center justify-between border-b pb-4">
+          <h1 class="text-xl font-bold">Host Dashboard</h1>
+          <button onclick="app.createNewRoom()" class="btn-navy text-sm">+ Create New Room</button>
+        </div>
+
+        <div class="space-y-4">
+          <h2 class="text-md font-semibold text-slate-700">Question Sets</h2>
+          <div id="host-sets-list" class="space-y-2"></div>
+        </div>
+      </section>
+
+      <!-- 4. ADD QUESTIONS CHOICE SCREEN -->
+      <section id="screen-add-choice" class="hidden space-y-6">
+        <h1 class="text-xl font-bold text-center">Add Questions</h1>
+        <p class="text-sm text-center text-slate-600">Choose how you want to add questions to your set.</p>
+
+        <div class="grid grid-cols-1 gap-4 my-6">
+          <button onclick="app.showScreen('editor')" class="p-6 border-2 border-slate-300 rounded hover:border-blue-900 text-left">
+            <h3 class="font-bold text-lg text-blue-900">1. Type Questions Manually</h3>
+            <p class="text-sm text-slate-600 mt-1">Use the manual editor or upload a CSV file of questions.</p>
+          </button>
+
+          <button onclick="app.showScreen('ai-generate')" class="p-6 border-2 border-slate-300 rounded hover:border-blue-900 text-left">
+            <h3 class="font-bold text-lg text-blue-900">2. Generate with AI</h3>
+            <p class="text-sm text-slate-600 mt-1">Specify topic, category, and difficulty. Host must verify all generated answers.</p>
+          </button>
+        </div>
+      </section>
+
+      <!-- 5. AI GENERATION & REVIEW SCREEN -->
+      <section id="screen-ai-generate" class="hidden space-y-6">
+        <h1 class="text-xl font-bold">AI Question Generator</h1>
+        
+        <div class="space-y-3">
+          <label class="block text-sm font-medium">Topic</label>
+          <input id="ai-topic" type="text" placeholder="Enter topic name" class="w-full border p-2 rounded">
+          
+          <label class="block text-sm font-medium">Category</label>
+          <select id="ai-category" class="w-full border p-2 rounded">
+            <option value="quantitative">Quantitative</option>
+            <option value="logical">Logical Reasoning</option>
+            <option value="verbal">Verbal Reasoning</option>
+            <option value="data_interpretation">Data Interpretation</option>
+          </select>
+
+          <label class="block text-sm font-medium">Difficulty</label>
+          <select id="ai-difficulty" class="w-full border p-2 rounded">
+            <option value="easy">Easy</option>
+            <option value="medium" selected>Medium</option>
+            <option value="hard">Hard</option>
+          </select>
+
+          <label class="block text-sm font-medium">Number of Questions (1-10)</label>
+          <div class="flex items-center space-x-2 mt-1">
+            <button type="button" onclick="app.adjustCount('ai-count', -1)" class="px-3 py-1.5 bg-slate-200 border border-slate-300 rounded font-bold text-slate-800 hover:bg-slate-300 text-sm">-</button>
+            <input id="ai-count" type="number" min="1" max="10" value="5" class="w-16 text-center border border-slate-300 p-1.5 rounded font-bold text-slate-900 bg-white text-sm">
+            <button type="button" onclick="app.adjustCount('ai-count', 1)" class="px-3 py-1.5 bg-slate-200 border border-slate-300 rounded font-bold text-slate-800 hover:bg-slate-300 text-sm">+</button>
+          </div>
+
+          <button onclick="app.requestAiQuestions()" class="btn-navy w-full mt-4">Generate Questions</button>
+        </div>
+      </section>
+
+      <!-- AI REVIEW SCREEN -->
+      <section id="screen-ai-review" class="hidden space-y-6">
+        <h1 class="text-xl font-bold">AI Review Screen</h1>
+        <p class="text-sm text-amber-800 bg-amber-50 p-2 rounded border border-amber-200">
+          AI-generated, please verify the answer before adding to room.
+        </p>
+
+        <div id="ai-pending-list" class="space-y-4"></div>
+
+        <button onclick="app.confirmAllAiQuestions()" class="btn-outline w-full text-sm">Confirm All Remaining</button>
+      </section>
+
+      <!-- 6. QUESTION SET EDITOR & AUTHORING -->
+      <section id="screen-editor" class="hidden space-y-6">
+        <h1 class="text-xl font-bold text-slate-900">Host Question Authoring</h1>
+        
+        <div class="space-y-3 bg-slate-50 p-4 border border-slate-200 rounded">
+          <label class="block text-xs font-bold uppercase text-slate-600">Quiz Title</label>
+          <input id="set-title" type="text" placeholder="Enter Quiz Title" class="w-full border border-slate-300 p-2 rounded">
+          
+          <div class="grid grid-cols-3 gap-2">
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-600">Category Topic</label>
+              <select id="set-topic" class="w-full border border-slate-300 p-2 rounded text-sm">
+                <option value="quantitative">Quantitative</option>
+                <option value="logical">Logical Reasoning</option>
+                <option value="verbal">Verbal Reasoning</option>
+                <option value="data_interpretation">Data Interpretation</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-600">Difficulty</label>
+              <select id="set-difficulty" class="w-full border border-slate-300 p-2 rounded text-sm">
+                <option value="easy">Easy</option>
+                <option value="medium" selected>Medium</option>
+                <option value="hard">Hard</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-600">Time / Question</label>
+              <select id="set-duration" class="w-full border border-slate-300 p-2 rounded text-sm font-semibold text-blue-950">
+                <option value="10000">10 Seconds</option>
+                <option value="15000" selected>15 Seconds</option>
+                <option value="20000">20 Seconds</option>
+                <option value="30000">30 Seconds</option>
+                <option value="45000">45 Seconds</option>
+                <option value="60000">1 Minute (60s)</option>
+                <option value="90000">1.5 Minutes (90s)</option>
+                <option value="120000">2 Minutes (120s)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Add Single Question Form -->
+        <div class="bg-white p-4 border border-slate-300 rounded space-y-3">
+          <h2 class="font-bold text-sm text-slate-800 uppercase">+ Add Question</h2>
+          
+          <textarea id="new-q-text" rows="2" placeholder="Enter question text" class="w-full border border-slate-300 p-2 rounded text-sm"></textarea>
+          
+          <div class="grid grid-cols-2 gap-2">
+            <input id="new-opt-a" type="text" placeholder="Option A" class="border border-slate-300 p-2 rounded text-sm">
+            <input id="new-opt-b" type="text" placeholder="Option B" class="border border-slate-300 p-2 rounded text-sm">
+            <input id="new-opt-c" type="text" placeholder="Option C" class="border border-slate-300 p-2 rounded text-sm">
+            <input id="new-opt-d" type="text" placeholder="Option D" class="border border-slate-300 p-2 rounded text-sm">
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 items-center">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600">Correct Option</label>
+              <select id="new-correct-opt" class="w-full border border-slate-300 p-2 rounded text-sm">
+                <option value="A">Option A</option>
+                <option value="B">Option B</option>
+                <option value="C">Option C</option>
+                <option value="D">Option D</option>
+              </select>
+            </div>
+            <input id="new-explanation" type="text" placeholder="Explanation (optional)" class="border border-slate-300 p-2 rounded text-sm mt-4">
+          </div>
+
+          <button onclick="app.addCustomQuestion()" class="btn-navy w-full text-sm">+ Add to Quiz Set</button>
+        </div>
+
+        <!-- AI Question Generator by Topic Box -->
+        <div class="bg-indigo-50 p-4 border border-indigo-200 rounded space-y-3">
+          <div class="flex justify-between items-center">
+            <h2 class="font-bold text-sm text-indigo-900 uppercase">✨ Generate Questions by Topic via AI API</h2>
+            <span class="text-xs bg-indigo-200 text-indigo-800 px-2 py-0.5 rounded font-semibold">Gemini LLM</span>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-700">Enter Specific Topic / Subject</label>
+            <input id="editor-ai-custom-topic" type="text" placeholder="e.g. Probability, Time & Distance, Syllogisms, Permutations..." class="w-full border border-slate-300 p-2 rounded text-sm bg-white font-medium mt-1">
+          </div>
+          
+          <div class="grid grid-cols-3 gap-2">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700">Category</label>
+              <select id="editor-ai-topic" class="w-full border border-slate-300 p-2 rounded text-sm bg-white">
+                <option value="quantitative">Quantitative</option>
+                <option value="logical">Logical Reasoning</option>
+                <option value="verbal">Verbal Reasoning</option>
+                <option value="data_interpretation">Data Interpretation</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700">Difficulty</label>
+              <select id="editor-ai-difficulty" class="w-full border border-slate-300 p-2 rounded text-sm bg-white">
+                <option value="easy">Easy</option>
+                <option value="medium" selected>Medium</option>
+                <option value="hard">Hard</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700">Count (1-10)</label>
+              <div class="flex items-center space-x-1 mt-1">
+                <button type="button" onclick="app.adjustCount('editor-ai-count', -1)" class="px-2.5 py-1 bg-slate-200 border border-slate-300 rounded font-bold text-slate-800 hover:bg-slate-300 text-xs">-</button>
+                <input id="editor-ai-count" type="number" min="1" max="10" value="5" class="w-14 text-center border border-slate-300 p-1 rounded font-bold text-slate-900 bg-white text-xs">
+                <button type="button" onclick="app.adjustCount('editor-ai-count', 1)" class="px-2.5 py-1 bg-slate-200 border border-slate-300 rounded font-bold text-slate-800 hover:bg-slate-300 text-xs">+</button>
+              </div>
+            </div>
+          </div>
+
+          <button id="btn-generate-ai" onclick="app.requestAiQuestionsFromEditor()" class="btn-navy w-full text-sm">
+            🤖 Generate Questions by Topic via AI API
+          </button>
+          <div id="ai-gen-status" class="hidden text-xs text-indigo-800 font-medium text-center">Generating questions via Gemini API... please wait.</div>
+        </div>
+
+        <!-- CSV Upload Option -->
+        <div class="bg-slate-50 p-3 border border-slate-200 rounded flex justify-between items-center text-xs">
+          <span class="font-semibold text-slate-600">Import CSV Questions File:</span>
+          <input type="file" id="csv-file-input" accept=".csv" onchange="app.importCsvQuestions(event)" class="text-xs">
+        </div>
+
+        <!-- Questions List -->
+        <div class="space-y-2">
+          <h2 class="font-bold text-sm text-slate-700">Questions in Set (<span id="set-q-count">0</span>):</h2>
+          <div id="editor-questions-list" class="space-y-3 max-h-64 overflow-y-auto"></div>
+        </div>
+
+        <button onclick="app.launchRoomWithCustomSet()" class="btn-navy w-full text-lg">🚀 Launch Live Room with This Set</button>
+      </section>
+
+      <!-- 7. LOBBY & HOST CONTROL CENTER -->
+      <section id="screen-lobby" class="hidden space-y-6 text-center">
+        <div class="bg-slate-100 p-4 rounded border border-slate-300">
+          <p class="text-xs uppercase font-semibold text-slate-500 tracking-wider">Session PIN</p>
+          <p id="lobby-pin" class="text-5xl font-mono font-bold text-slate-900 tracking-widest my-2"></p>
+          <p id="lobby-share-url" class="text-xs font-mono text-slate-600 truncate"></p>
+        </div>
+
+        <!-- Large QR Code for projection -->
+        <div class="flex flex-col items-center justify-center my-4">
+          <div id="lobby-qrcode" class="p-2 bg-white border border-slate-300 rounded"></div>
+        </div>
+
+        <!-- Separate Dashboard Sharing URLs for Host -->
+        <div id="host-controls" class="hidden space-y-3 bg-slate-50 p-4 rounded border text-left">
+          <p class="text-xs font-bold uppercase text-slate-600">Host Room Control Panel</p>
+          <div class="grid grid-cols-2 gap-2 text-xs">
+            <button onclick="app.copyLink()" class="btn-outline py-2 px-2 text-center">📋 Copy Player Link</button>
+            <button onclick="app.copySpectatorUrl()" class="btn-outline py-2 px-2 text-center">📺 Copy Spectator URL</button>
+            <button onclick="app.copyProctorUrl()" class="btn-outline py-2 px-2 text-center">🛡️ Copy Proctor / Referee URL</button>
+            <button onclick="app.toggleLockRoom()" class="btn-outline py-2 px-2 text-center">🔒 Lock / Unlock Room</button>
+          </div>
+          <div class="flex items-center justify-between text-xs bg-white p-2 border rounded">
+            <span class="font-bold text-slate-700">Question Duration:</span>
+            <select id="lobby-question-duration" onchange="app.updateQuestionDuration(this.value)" class="border border-slate-300 p-1 rounded font-semibold text-slate-900">
+              <option value="10000">10s per question</option>
+              <option value="15000" selected>15s per question</option>
+              <option value="20000">20s per question</option>
+              <option value="30000">30s per question</option>
+              <option value="45000">45s per question</option>
+              <option value="60000">1 min per question</option>
+              <option value="90000">1.5 min per question</option>
+              <option value="120000">2 min per question</option>
+            </select>
+          </div>
+          <button onclick="app.hostStartGame()" class="btn-navy w-full text-base mt-2">🚀 Start Live Game</button>
+        </div>
+
+        <div class="text-left space-y-2">
+          <p class="text-sm font-bold text-slate-700">Connected Players (<span id="lobby-count">0</span>/50):</p>
+          <ul id="lobby-player-list" class="divide-y border border-slate-200 rounded max-h-48 overflow-y-auto bg-white p-2"></ul>
+        </div>
+      </section>
+
+      <!-- 7.5. PRE-QUIZ INSTRUCTION SCREEN (SHOWN BEFORE QUESTION 1) -->
+      <section id="screen-instructions" class="hidden space-y-6 text-left">
+        <div class="bg-blue-950 text-white p-5 rounded-lg text-center shadow-md space-y-2">
+          <span class="text-xs uppercase font-mono tracking-widest text-blue-200 block">Official Test Guidelines</span>
+          <h1 id="instructions-title" class="text-2xl font-bold">Aptitude Quiz Instructions</h1>
+          <div class="inline-flex items-center space-x-2 bg-amber-400 text-slate-950 font-bold px-3.5 py-1 rounded-full text-xs font-mono">
+            <span>Quiz starting in <span id="instructions-timer" class="text-sm font-extrabold">5</span>s...</span>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          <!-- Card 1: Format & Timing -->
+          <div class="bg-white p-4 border border-slate-300 rounded-lg space-y-2">
+            <h3 class="font-bold text-slate-800 uppercase tracking-wider flex items-center space-x-1.5">
+              <span>⏱️ Format & Duration</span>
+            </h3>
+            <ul class="space-y-1.5 text-slate-600 list-disc pl-4">
+              <li>Total Questions: <span id="inst-q-count" class="font-bold text-slate-900">10</span></li>
+              <li>Time Per Question: <span id="inst-duration" class="font-bold text-slate-900">15s</span></li>
+              <li>Timer starts immediately when each question appears on screen.</li>
+            </ul>
+          </div>
+
+          <!-- Card 2: Scoring Rules -->
+          <div class="bg-white p-4 border border-slate-300 rounded-lg space-y-2">
+            <h3 class="font-bold text-slate-800 uppercase tracking-wider flex items-center space-x-1.5">
+              <span>🎯 Scoring & Speed Bonus</span>
+            </h3>
+            <ul class="space-y-1.5 text-slate-600 list-disc pl-4">
+              <li>Base Points: <span class="font-bold text-emerald-700">1,000 points</span> for correct answers.</li>
+              <li>Speed Bonus: Answering faster yields higher bonus points.</li>
+              <li>Incorrect or expired answers yield 0 points.</li>
+            </ul>
+          </div>
+
+          <!-- Card 3: Interface & Shapes -->
+          <div class="bg-white p-4 border border-slate-300 rounded-lg space-y-2">
+            <h3 class="font-bold text-slate-800 uppercase tracking-wider flex items-center space-x-1.5">
+              <span>♿ Colorblind-Safe Options</span>
+            </h3>
+            <p class="text-slate-600">Every option is paired with a distinct geometric shape:</p>
+            <div class="grid grid-cols-2 gap-1.5 font-mono font-bold text-slate-800 text-[11px] pt-1">
+              <div class="flex items-center space-x-1"><span>■</span> <span>Option A (Square)</span></div>
+              <div class="flex items-center space-x-1"><span>●</span> <span>Option B (Circle)</span></div>
+              <div class="flex items-center space-x-1"><span>▲</span> <span>Option C (Triangle)</span></div>
+              <div class="flex items-center space-x-1"><span>◆</span> <span>Option D (Diamond)</span></div>
+            </div>
+          </div>
+
+          <!-- Card 4: Proctoring & Disqualification -->
+          <div class="bg-white p-4 border border-rose-200 rounded-lg space-y-2 bg-rose-50/40">
+            <h3 class="font-bold text-rose-900 uppercase tracking-wider flex items-center space-x-1.5">
+              <span>🛡️ Fair Play & Proctoring</span>
+            </h3>
+            <ul class="space-y-1.5 text-rose-800 list-disc pl-4">
+              <li>Do NOT switch tabs, minimize windows, or change devices.</li>
+              <li>Proctor & Referee monitoring is active during live testing.</li>
+              <li>Receiving <span class="font-bold text-red-600">3 warnings</span> results in instant disqualification.</li>
+            </ul>
+          </div>
+        </div>
+
+        <button onclick="app.startQuestionNow()" class="btn-navy w-full text-base py-3 font-bold shadow">
+          🚀 I Understand — Start Quiz Now!
+        </button>
+      </section>
+
+      <!-- 8. LIVE QUESTION SCREEN (PLAYER & HOST) -->
+      <section id="screen-question" class="hidden space-y-6">
+        <!-- Countdown Bar -->
+        <div class="w-full bg-slate-200 h-3 rounded-full overflow-hidden">
+          <div id="timer-bar" class="bg-blue-900 h-full w-full transition-all duration-100 ease-linear"></div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 items-start">
+          <!-- MAIN QUESTION & OPTIONS AREA (3 cols on desktop) -->
+          <div class="lg:col-span-3 space-y-4">
+            <div class="flex justify-between items-center text-sm font-semibold text-slate-600">
+              <div class="flex items-center space-x-2">
+                <span class="text-xs font-mono uppercase bg-slate-100 px-2 py-1 rounded text-slate-700">Live Round</span>
+                <span class="text-xs font-mono text-slate-500">Q <span id="q-num">1</span> of <span id="q-total">10</span></span>
+              </div>
+              <div class="flex items-center space-x-2">
+                <button id="btn-mobile-leaderboard" onclick="app.openMobileLeaderboard()" class="lg:hidden btn-outline text-xs px-2.5 py-1 flex items-center space-x-1">
+                  <span>🏆 Leaderboard</span>
+                </button>
+                <span class="text-xl font-mono text-slate-900" id="timer-text">15.0s</span>
+              </div>
+            </div>
+
+            <!-- Left Score Badge -->
+            <div class="bg-slate-900 text-white p-3 rounded flex justify-between items-center shadow-sm">
+              <span class="text-xs uppercase font-semibold text-slate-300">My Total Score:</span>
+              <span id="player-score-box" class="text-xl font-bold font-mono text-yellow-400">0 pts</span>
+            </div>
+
+            <h2 id="q-text" class="text-lg font-bold text-slate-900"></h2>
+
+            <!-- Colorblind-safe options (Square, Circle, Triangle, Diamond) -->
+            <div id="options-container" class="space-y-3"></div>
+
+            <div id="answer-locked-notice" class="hidden notice-box text-center text-blue-900 font-bold">
+              ✓ Answer locked. Waiting for round to complete...
+            </div>
+
+            <!-- INLINE REVEAL RESULT BOX -->
+            <div id="inline-reveal-container" class="hidden p-4 rounded-lg border text-left space-y-2">
+              <p id="inline-reveal-text" class="text-base font-bold"></p>
+              <p id="inline-reveal-explanation" class="text-xs text-slate-600"></p>
+            </div>
+          </div>
+
+          <!-- DESKTOP PERMANENT LIVE LEADERBOARD PANEL (1 col on 1024px+) -->
+          <div class="hidden lg:block lg:col-span-1 bg-slate-50 p-3 border border-slate-300 rounded-lg space-y-2 text-xs">
+            <div class="flex justify-between items-center border-b pb-1">
+              <h3 class="font-bold text-slate-800 uppercase tracking-wider text-[11px]">🏆 Live Leaderboard</h3>
+              <span class="text-[10px] text-slate-500 font-mono">Top 10</span>
+            </div>
+            
+            <div id="live-side-leaderboard" class="divide-y divide-slate-200 max-h-80 overflow-y-auto bg-white rounded border">
+              <p class="text-slate-400 italic text-[11px] p-2 text-center">Standings update as players answer...</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 9. SPECTATOR / PROJECTOR DASHBOARD -->
+      <section id="screen-spectator" class="hidden space-y-6 text-center">
+        <div class="bg-blue-950 text-white p-6 rounded-lg shadow-md">
+          <p class="text-xs uppercase tracking-widest font-semibold text-blue-200">Spectator / Hall View</p>
+          <p id="spec-pin" class="text-6xl font-mono font-bold tracking-widest my-3"></p>
+          <p id="spec-link" class="text-sm font-mono text-blue-200"></p>
+        </div>
+
+        <div class="flex justify-center my-4">
+          <div id="spec-qrcode" class="p-3 bg-white border border-slate-300 rounded shadow-sm"></div>
+        </div>
+
+        <div id="spec-live-content" class="space-y-4 text-left">
+          <p class="text-center text-sm font-semibold text-slate-600">Waiting for host to start live quiz...</p>
+        </div>
+      </section>
+
+      <!-- 10. PROCTOR / REFEREE PANEL DASHBOARD -->
+      <section id="screen-proctor" class="hidden space-y-6">
+        <div class="flex items-center justify-between border-b pb-3">
+          <h1 class="text-xl font-bold text-slate-900">Proctor & Referee Panel</h1>
+          <span class="text-xs bg-slate-100 text-slate-700 px-2 py-1 rounded">Code: <span id="proctor-code-disp" class="font-mono font-bold"></span></span>
+        </div>
+
+        <div class="space-y-3">
+          <h2 class="text-sm font-bold text-slate-700 uppercase">Live Player Roster</h2>
+          <div id="proctor-player-list" class="divide-y border rounded bg-white max-h-64 overflow-y-auto"></div>
+        </div>
+      </section>
+
+      <!-- 11. REVEAL SCREEN -->
+      <section id="screen-reveal" class="hidden space-y-6 text-center">
+        <h1 class="text-2xl font-bold">Round Result</h1>
+
+        <div id="reveal-box" class="p-6 rounded border text-left space-y-3">
+          <p id="reveal-text" class="text-xl font-bold"></p>
+          <p id="reveal-explanation" class="text-sm text-slate-600"></p>
+        </div>
+      </section>
+
+      <!-- 12. LEADERBOARD SCREEN -->
+      <section id="screen-leaderboard" class="hidden space-y-6">
+        <div class="flex justify-between items-center border-b pb-2">
+          <h1 class="text-xl font-bold text-slate-900">Live Leaderboard</h1>
+          <span class="text-xs bg-slate-100 font-mono text-slate-700 px-2 py-1 rounded">Question <span id="lb-q-num">1</span> of <span id="lb-q-total">10</span></span>
+        </div>
+
+        <table class="w-full border-collapse text-sm">
+          <thead>
+            <tr class="border-b bg-slate-100 text-left text-xs uppercase text-slate-600">
+              <th class="p-2">Rank</th>
+              <th class="p-2">Player</th>
+              <th class="p-2 text-right">Score</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboard-body" class="divide-y bg-white"></tbody>
+        </table>
+
+        <div id="my-rank-banner" class="bg-blue-50 border border-blue-200 p-3 rounded text-center text-sm font-semibold text-blue-950"></div>
+      </section>
+
+      <!-- 13. FINAL RESULTS SCREEN -->
+      <section id="screen-results" class="hidden space-y-6">
+        <h1 class="text-2xl font-bold text-center text-slate-900">Quiz Completed!</h1>
+        
+        <!-- Player Performance Stat Cards -->
+        <div id="results-my-stats" class="grid grid-cols-2 gap-3">
+          <div class="bg-blue-950 text-white p-4 rounded-lg text-center shadow-sm">
+            <span class="text-xs uppercase font-semibold text-blue-200 block">Accuracy</span>
+            <span id="res-accuracy-val" class="text-3xl font-bold font-mono text-yellow-400 block mt-1">0%</span>
+            <span id="res-correct-detail" class="text-xs text-blue-200 block mt-1">0 / 0 Correct</span>
+          </div>
+          <div class="bg-slate-900 text-white p-4 rounded-lg text-center shadow-sm">
+            <span class="text-xs uppercase font-semibold text-slate-400 block">Avg Speed</span>
+            <span id="res-speed-val" class="text-3xl font-bold font-mono text-emerald-400 block mt-1">0.0s</span>
+            <span class="text-xs text-slate-300 block mt-1">Per Question</span>
+          </div>
+        </div>
+
+        <!-- Topic-Wise Strengths Progress Bars -->
+        <div class="bg-slate-50 p-4 border border-slate-200 rounded-lg space-y-3">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-700">Topic-Wise Strengths</h2>
+          <div id="results-topic-bars" class="space-y-2 text-xs"></div>
+        </div>
+
+        <!-- Final Summary Leaderboard -->
+        <div class="space-y-2">
+          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-700">Final Room Standings</h2>
+          <table class="w-full border-collapse text-sm bg-white border rounded">
+            <thead>
+              <tr class="border-b bg-slate-100 text-left text-xs uppercase text-slate-600">
+                <th class="p-2">Rank</th>
+                <th class="p-2">Player</th>
+                <th class="p-2 text-right">Score</th>
+              </tr>
+            </thead>
+            <tbody id="results-body" class="divide-y"></tbody>
+          </table>
+        </div>
+
+        <button onclick="app.showScreen('join')" class="btn-navy w-full text-base">Back to Join Screen</button>
+      </section>
+
+      <!-- 14. COLLEGE LEAGUE SCREEN -->
+      <section id="screen-league" class="hidden space-y-6">
+        <h1 class="text-2xl font-bold text-center">College League Standings</h1>
+        <p class="text-xs text-center text-slate-500">Colleges ranked by top 5 players' average score.</p>
+        
+        <div class="border rounded divide-y bg-white" id="league-list">
+          <div class="p-3 flex justify-between font-bold bg-slate-100 text-xs">
+            <span>College</span>
+            <span>Avg Points</span>
+          </div>
+          <div class="p-3 flex justify-between text-sm">
+            <span>1. IIT Bombay (IITB)</span>
+            <span>942 pts</span>
+          </div>
+          <div class="p-3 flex justify-between text-sm">
+            <span>2. BITS Pilani (BITS)</span>
+            <span>910 pts</span>
+          </div>
+          <div class="p-3 flex justify-between text-sm">
+            <span>3. NIT Trichy (NITT)</span>
+            <span>885 pts</span>
+          </div>
+        </div>
+
+        <button onclick="app.showScreen('join')" class="btn-outline w-full">Back to Join</button>
+      </section>
+
+    </div>
+  </main>
+
+  <!-- MOBILE LEADERBOARD BOTTOM SHEET MODAL -->
+  <div id="backdrop-mobile-leaderboard" onclick="app.closeMobileLeaderboard()" class="hidden fixed inset-0 bg-slate-900/50 z-40 lg:hidden"></div>
+  <div id="bottom-sheet-leaderboard" class="hidden fixed bottom-0 left-0 right-0 bg-white border-t-2 border-slate-300 rounded-t-xl z-50 p-4 space-y-3 max-h-[75vh] overflow-y-auto shadow-2xl lg:hidden">
+    <div class="flex justify-between items-center border-b pb-2">
+      <h3 class="font-bold text-slate-800 uppercase tracking-wider text-xs flex items-center space-x-1">
+        <span>🏆 Live Room Leaderboard</span>
+      </h3>
+      <button onclick="app.closeMobileLeaderboard()" class="text-slate-500 font-bold hover:text-slate-800 text-base px-2">✕</button>
+    </div>
+    <div id="mobile-leaderboard-list" class="divide-y divide-slate-200 bg-white rounded border text-xs"></div>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
