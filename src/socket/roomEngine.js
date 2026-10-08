@@ -41,7 +41,8 @@ export class Room {
       require_google: settings.require_google ?? true,
     };
 
-    this.proctorCode = generateProctorCode();
+    const customCode = settings.proctorCode ? String(settings.proctorCode).trim().toUpperCase() : '';
+    this.proctorCode = customCode && customCode.length >= 3 ? customCode : generateProctorCode();
     this.proctorCodeHash = hashToken(this.proctorCode);
 
     // Keyed by userId (number or string for guest)
@@ -58,6 +59,18 @@ export class Room {
     this.previousRanks = new Map(); // userId -> lastRank
   }
 
+  getPlayer(userId) {
+    if (userId === undefined || userId === null) return null;
+    const numId = Number(userId);
+    const strId = String(userId);
+    return (
+      this.players.get(userId) ||
+      this.players.get(numId) ||
+      this.players.get(strId) ||
+      Array.from(this.players.values()).find((p) => Number(p.userId) === numId)
+    );
+  }
+
   // --- JOIN & REJOIN CHECKS ---
   checkCanJoin(user, isInviteLink = false) {
     // 1. PIN or Link valid (handled by room lookup)
@@ -71,8 +84,8 @@ export class Room {
     }
 
     // Check if user is disqualified in this room
-    const existingPlayer = this.players.get(user.id);
-    if (existingPlayer && existingPlayer.status === 'disqualified') {
+    const existingPlayer = this.getPlayer(user.id);
+    if (existingPlayer && (existingPlayer.status === 'disqualified' || existingPlayer.warningCount >= 3)) {
       throw new AppError('DISQUALIFIED');
     }
 
@@ -99,10 +112,11 @@ export class Room {
       return { player: null, isHost: true, takeover: false };
     }
 
-    const existing = this.players.get(user.id);
+    const existing = this.getPlayer(user.id);
 
     if (existing) {
-      if (existing.status === 'disqualified') {
+      if (existing.status === 'disqualified' || existing.warningCount >= 3) {
+        existing.status = 'disqualified';
         throw new AppError('DISQUALIFIED');
       }
       // Connection takeover
@@ -134,7 +148,9 @@ export class Room {
   disconnectPlayer(socketId) {
     for (const [userId, p] of this.players.entries()) {
       if (p.socketId === socketId) {
-        p.status = 'disconnected';
+        if (p.status !== 'disqualified') {
+          p.status = 'disconnected';
+        }
         p.lastSeenAt = Date.now();
         break;
       }
@@ -395,13 +411,13 @@ export class Room {
 
   // --- WARNING & DISQUALIFICATION ENGINE ---
   warnPlayer(targetUserId, issuerRole, reason, questionNumber = 0) {
-    const player = this.players.get(targetUserId);
+    const player = this.getPlayer(targetUserId);
     if (!player) {
       throw new AppError('VALIDATION_ERROR', 'Player not found in room');
     }
 
     if (player.status === 'disqualified') {
-      return { alreadyDisqualified: true, warningCount: 3 };
+      return { alreadyDisqualified: true, warningCount: 3, disqualified: true };
     }
 
     this.warningCounter++;
@@ -410,7 +426,7 @@ export class Room {
 
     const record = {
       warningId,
-      userId: targetUserId,
+      userId: player.userId,
       issuerRole,
       reason,
       questionNumber: questionNumber || this.currentQuestionIndex + 1,
@@ -441,7 +457,7 @@ export class Room {
     }
 
     record.revoked = true;
-    const player = this.players.get(record.userId);
+    const player = this.getPlayer(record.userId);
     if (player) {
       player.warningCount = Math.max(0, player.warningCount - 1);
       if (player.status === 'disqualified' && player.warningCount < 3) {
@@ -453,14 +469,14 @@ export class Room {
   }
 
   reinstatePlayer(targetUserId) {
-    const player = this.players.get(targetUserId);
+    const player = this.getPlayer(targetUserId);
     if (!player) {
       throw new AppError('VALIDATION_ERROR', 'Player not found in room');
     }
 
     player.status = 'active';
     player.warningCount = 2; // Set back to 2 warnings
-    return { userId: targetUserId, warningCount: player.warningCount };
+    return { userId: player.userId, warningCount: player.warningCount };
   }
 }
 

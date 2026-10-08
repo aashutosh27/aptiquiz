@@ -147,14 +147,15 @@ app.post('/api/rooms', (req, res, next) => {
   try {
     const cookie = req.cookies?.apti_session;
     const user = cookie ? JSON.parse(cookie) : { id: 1, role: 'host' };
-    const { questions, settings, questionDurationMs } = req.body;
+    const { questions, settings, questionDurationMs, proctorCode } = req.body;
 
     const rawQuestions = questions && Array.isArray(questions) && questions.length > 0 ? questions : sampleQuestions.slice(0, 10);
     const qList = rawQuestions.map((q, idx) => ({
       ...q,
       id: q.id !== undefined && q.id !== null ? Number(q.id) : idx + 1,
     }));
-    const room = roomManager.createRoom(user.id, qList, settings);
+    const roomSettings = { ...(settings || {}), proctorCode: proctorCode || settings?.proctorCode };
+    const room = roomManager.createRoom(user.id, qList, roomSettings);
 
     if (questionDurationMs) {
       room.questionDurationMs = Number(questionDurationMs);

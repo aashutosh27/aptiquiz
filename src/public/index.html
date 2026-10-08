@@ -187,7 +187,7 @@
           <label class="block text-xs font-bold uppercase text-slate-600">Quiz Title</label>
           <input id="set-title" type="text" placeholder="Enter Quiz Title" class="w-full border border-slate-300 p-2 rounded">
           
-          <div class="grid grid-cols-3 gap-2">
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
             <div>
               <label class="block text-xs font-bold uppercase text-slate-600">Category Topic</label>
               <select id="set-topic" class="w-full border border-slate-300 p-2 rounded text-sm">
@@ -217,6 +217,10 @@
                 <option value="90000">1.5 Minutes (90s)</option>
                 <option value="120000">2 Minutes (120s)</option>
               </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-600">Proctor Code (Optional)</label>
+              <input id="set-proctor-code" type="text" placeholder="e.g. REF123" class="w-full border border-slate-300 p-2 rounded text-sm font-mono font-bold uppercase">
             </div>
           </div>
         </div>

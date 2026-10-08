@@ -341,6 +341,7 @@ class AptiApp {
   async launchRoomWithCustomSet() {
     const title = document.getElementById('set-title').value.trim() || 'Aptitude Quiz';
     const durationMs = parseInt(document.getElementById('set-duration').value, 10) || 15000;
+    const proctorCodeInput = document.getElementById('set-proctor-code')?.value.trim();
 
     const res = await fetch('/api/rooms', {
       method: 'POST',
@@ -349,6 +350,7 @@ class AptiApp {
         questions: this.customQuestionsList,
         questionDurationMs: durationMs,
         settings: { title, durationMs },
+        proctorCode: proctorCodeInput || undefined,
       }),
     });
 
@@ -479,7 +481,17 @@ class AptiApp {
 
   refreshLobby() {
     if (this.currentRoom) {
-      this.socket.emit('room:rejoin', { roomId: this.currentRoom.roomId });
+      const roomId = this.currentRoom.roomId || this.currentRoom.id;
+      const pin = this.currentRoom.pin;
+      this.socket.emit('room:rejoin', { roomId, pin }, (res) => {
+        if (res && res.success && res.snapshot) {
+          this.currentRoom = res.snapshot;
+          const proctorScreen = document.getElementById('screen-proctor');
+          if (proctorScreen && !proctorScreen.classList.contains('hidden')) {
+            this.renderProctorRoster();
+          }
+        }
+      });
     }
   }
 

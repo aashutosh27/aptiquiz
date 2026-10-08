@@ -77,6 +77,6 @@ export const warnPlayerPayloadSchema = z.object({
 });
 
 export const proctorAuthPayloadSchema = z.object({
-  proctorCode: z.string().min(4).max(10),
+  proctorCode: z.string().min(1, 'Proctor code is required.').max(30),
   pin: z.string().optional(),
 });
