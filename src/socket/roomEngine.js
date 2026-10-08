@@ -57,6 +57,36 @@ export class Room {
 
     this.queue = new RoomQueue();
     this.previousRanks = new Map(); // userId -> lastRank
+    this.activeProctors = new Set();
+    this.activeSpectators = new Set();
+  }
+
+  addActiveProctor(socketId) {
+    if (!this.activeProctors) this.activeProctors = new Set();
+    this.activeProctors.add(socketId);
+  }
+
+  removeActiveProctor(socketId) {
+    if (this.activeProctors) this.activeProctors.delete(socketId);
+  }
+
+  getActiveProctorCount(excludeSocketId = null) {
+    if (!this.activeProctors) return 0;
+    return Array.from(this.activeProctors).filter((id) => id !== excludeSocketId).length;
+  }
+
+  addActiveSpectator(socketId) {
+    if (!this.activeSpectators) this.activeSpectators = new Set();
+    this.activeSpectators.add(socketId);
+  }
+
+  removeActiveSpectator(socketId) {
+    if (this.activeSpectators) this.activeSpectators.delete(socketId);
+  }
+
+  getActiveSpectatorCount(excludeSocketId = null) {
+    if (!this.activeSpectators) return 0;
+    return Array.from(this.activeSpectators).filter((id) => id !== excludeSocketId).length;
   }
 
   getPlayer(userId) {

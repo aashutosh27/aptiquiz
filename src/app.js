@@ -149,8 +149,16 @@ app.post('/api/rooms', (req, res, next) => {
     const user = cookie ? JSON.parse(cookie) : { id: 1, role: 'host' };
     const { questions, settings, questionDurationMs, proctorCode } = req.body;
 
-    const rawQuestions = questions && Array.isArray(questions) && questions.length > 0 ? questions : sampleQuestions.slice(0, 10);
-    const qList = rawQuestions.map((q, idx) => ({
+    const quizTitle = settings?.title?.trim();
+    if (!quizTitle || quizTitle.length < 3) {
+      throw new AppError('VALIDATION_ERROR', 'Quiz title is compulsory (at least 3 characters).');
+    }
+
+    if (!questions || !Array.isArray(questions) || questions.length < 1) {
+      throw new AppError('VALIDATION_ERROR', 'At least 1 question is required to create a quiz room.');
+    }
+
+    const qList = questions.map((q, idx) => ({
       ...q,
       id: q.id !== undefined && q.id !== null ? Number(q.id) : idx + 1,
     }));

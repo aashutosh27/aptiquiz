@@ -103,6 +103,15 @@ export function setupSocketIO(server) {
         throw new AppError('ROOM_NOT_FOUND');
       }
 
+      if (parsed.isSpectator) {
+        const specCount = room.getActiveSpectatorCount(socket.id);
+        if (specCount >= 2) {
+          throw new AppError('ROOM_FULL', 'Spectator limit reached. Maximum 2 spectators allowed per room.');
+        }
+        room.addActiveSpectator(socket.id);
+        socket.isSpectator = true;
+      }
+
       room.checkCanJoin(socket.user, !!parsed.inviteToken);
 
       const { player, isHost, takeover } = room.addPlayer(
@@ -260,7 +269,16 @@ export function setupSocketIO(server) {
       if (!currentRoom) throw new AppError('ROOM_NOT_FOUND');
 
       const isHost = Number(currentRoom.hostId) === Number(socket.user.id) || socket.user.role === 'host';
-      if (isHost || (parsed.proctorCode && currentRoom.proctorCode.toUpperCase() === parsed.proctorCode.toUpperCase())) {
+      const isValidCode = parsed.proctorCode && currentRoom.proctorCode.toUpperCase() === parsed.proctorCode.toUpperCase();
+
+      if (isHost || isValidCode) {
+        if (!isHost) {
+          const proctorCount = currentRoom.getActiveProctorCount(socket.id);
+          if (proctorCount >= 1) {
+            throw new AppError('ROOM_FULL', 'Referee limit reached. Only 1 referee is allowed per room.');
+          }
+        }
+        currentRoom.addActiveProctor(socket.id);
         isProctor = true;
         socket.isProctor = true;
         if (typeof callback === 'function') callback({ success: true, isHost });
@@ -345,6 +363,8 @@ export function setupSocketIO(server) {
 
     socket.on('disconnect', () => {
       if (currentRoom) {
+        currentRoom.removeActiveProctor(socket.id);
+        currentRoom.removeActiveSpectator(socket.id);
         currentRoom.disconnectPlayer(socket.id);
         io.to(`room_${currentRoom.id}`).emit('room:player_left', {
           userId: socket.user.id,

@@ -339,7 +339,17 @@ class AptiApp {
   }
 
   async launchRoomWithCustomSet() {
-    const title = document.getElementById('set-title').value.trim() || 'Aptitude Quiz';
+    const title = document.getElementById('set-title').value.trim();
+    if (!title || title.length < 3) {
+      this.showError('Quiz title is compulsory (at least 3 characters).');
+      return;
+    }
+
+    if (!this.customQuestionsList || this.customQuestionsList.length < 1) {
+      this.showError('At least 1 question is compulsory to launch a quiz room.');
+      return;
+    }
+
     const durationMs = parseInt(document.getElementById('set-duration').value, 10) || 15000;
     const proctorCodeInput = document.getElementById('set-proctor-code')?.value.trim();
 
@@ -360,7 +370,8 @@ class AptiApp {
       this.socket.emit('room:join', { pin: data.room.pin });
       this.renderLobby(data.room);
     } else {
-      this.showError('Failed to create room.');
+      const errData = await res.json().catch(() => ({}));
+      this.showError(errData.message || 'Failed to create room.');
     }
   }
 
@@ -590,7 +601,12 @@ class AptiApp {
     }
 
     if (pin && this.socket) {
-      this.socket.emit('room:join', { pin });
+      this.socket.emit('room:join', { pin, isSpectator: true }, (res) => {
+        if (res && res.error) {
+          this.showError(res.error.message || 'Failed to join as Spectator.');
+          this.showScreen(this.user ? 'join' : 'signin');
+        }
+      });
     }
   }
 

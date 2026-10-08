@@ -62,6 +62,7 @@ export const joinRoomPayloadSchema = z.object({
   pin: z.string().length(6, 'PIN must be exactly 6 digits.').optional(),
   inviteToken: z.string().optional(),
   guestName: z.string().min(2, 'Enter a name of 2 to 30 characters.').max(30, 'Enter a name of 2 to 30 characters.').optional(),
+  isSpectator: z.boolean().optional(),
 });
 
 export const submitAnswerPayloadSchema = z.object({
