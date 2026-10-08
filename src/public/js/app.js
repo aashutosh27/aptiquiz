@@ -531,6 +531,11 @@ class AptiApp {
       this.renderProctorRoster();
     }
 
+    const spectatorScreen = document.getElementById('screen-spectator');
+    if (spectatorScreen && !spectatorScreen.classList.contains('hidden')) {
+      this.renderSpectatorDashboard();
+    }
+
     const hostLiveScreen = document.getElementById('screen-host-live');
     if (hostLiveScreen && !hostLiveScreen.classList.contains('hidden')) {
       this.updateHostLiveStats();
@@ -543,6 +548,87 @@ class AptiApp {
 
   refreshProctorRoster() {
     this.refreshRoomUI();
+  }
+
+  // --- SPECTATOR / PROJECTOR MODE DASHBOARD ---
+  openSpectatorMode(pin) {
+    this.showScreen('spectator');
+    document.getElementById('spec-pin').innerText = pin || '------';
+
+    if (!this.socket) this.initSocket();
+
+    if (pin && this.socket) {
+      this.socket.emit('room:join', { pin, isSpectator: true }, (res) => {
+        if (res && res.success && res.snapshot) {
+          this.currentRoom = res.snapshot;
+          this.renderSpectatorDashboard();
+        } else if (res && res.error) {
+          this.showError(res.error.message || 'Failed to join as Spectator.');
+          this.showScreen(this.user ? 'join' : 'signin');
+        }
+      });
+    }
+  }
+
+  renderSpectatorDashboard() {
+    const list = document.getElementById('spec-player-list');
+    const countEl = document.getElementById('spec-player-count');
+    if (!list) return;
+
+    if (!this.currentRoom || !this.currentRoom.players) {
+      list.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-xs text-slate-400 italic">No players connected to this room.</td></tr>`;
+      if (countEl) countEl.innerText = '0';
+      return;
+    }
+
+    const hostId = Number(this.currentRoom.hostId);
+    const rawPlayers = Array.isArray(this.currentRoom.players)
+      ? this.currentRoom.players
+      : Array.from(this.currentRoom.players.values());
+
+    const players = rawPlayers
+      .filter((p) => Number(p.userId) !== hostId)
+      .sort((a, b) => (b.score || 0) - (a.score || 0));
+
+    if (countEl) countEl.innerText = players.length;
+
+    if (players.length === 0) {
+      list.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-xs text-slate-400 italic">No student players joined yet.</td></tr>`;
+      return;
+    }
+
+    list.innerHTML = players
+      .map((p, idx) => {
+        const isDisqualified = p.status === 'disqualified';
+        const warningCount = p.warningCount || 0;
+        const rank = idx + 1;
+
+        let warningBadge = '';
+        if (isDisqualified) {
+          warningBadge = `<span class="text-xs font-bold bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full">🚫 Disqualified (3/3)</span>`;
+        } else if (warningCount === 2) {
+          warningBadge = `<span class="text-xs font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">⚠️⚠️ 2 / 3 Warnings</span>`;
+        } else if (warningCount === 1) {
+          warningBadge = `<span class="text-xs font-semibold bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">⚠️ 1 / 3 Warning</span>`;
+        } else {
+          warningBadge = `<span class="text-xs font-medium bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">0 / 3 Clean</span>`;
+        }
+
+        return `
+          <tr class="${isDisqualified ? 'bg-rose-50/50 opacity-75' : 'hover:bg-slate-50'} text-xs">
+            <td class="p-2.5 font-mono font-bold text-center text-slate-600">#${rank}</td>
+            <td class="p-2.5 font-medium text-slate-900">
+              <div class="flex items-center space-x-1.5">
+                <span>${p.displayName}</span>
+                ${p.status === 'disconnected' ? '<span class="text-[10px] text-amber-600">(Away)</span>' : ''}
+              </div>
+            </td>
+            <td class="p-2.5 text-right font-mono font-bold text-blue-950 text-sm">${p.score || 0} pts</td>
+            <td class="p-2.5 text-center">${warningBadge}</td>
+          </tr>
+        `;
+      })
+      .join('');
   }
 
   hostStartGame() {
@@ -897,20 +983,35 @@ class AptiApp {
 
     if (lbBody) {
       if (playersList.length === 0) {
-        lbBody.innerHTML = `<tr><td colspan="3" class="p-3 text-center text-slate-400 text-xs italic">Waiting for student players to join room...</td></tr>`;
+        lbBody.innerHTML = `<tr><td colspan="4" class="p-3 text-center text-slate-400 text-xs italic">Waiting for student players to join room...</td></tr>`;
         return;
       }
 
-      lbBody.innerHTML = playersList.map((p, index) => `
-        <tr class="hover:bg-slate-50">
-          <td class="p-2 font-mono font-bold text-slate-600">${index + 1}</td>
-          <td class="p-2 font-medium text-slate-900 flex items-center space-x-1">
-            <span>${p.displayName}</span>
-            ${p.status === 'disconnected' ? '<span class="text-[10px] text-amber-600 font-normal">(Away)</span>' : ''}
-          </td>
-          <td class="p-2 text-right font-mono font-bold text-blue-950">${p.score} pts</td>
-        </tr>
-      `).join('');
+      lbBody.innerHTML = playersList.map((p, index) => {
+        const warningCount = p.warningCount || 0;
+        let warningBadge = '';
+        if (warningCount === 2) {
+          warningBadge = `<span class="text-xs font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">⚠️⚠️ 2 / 3 Warnings</span>`;
+        } else if (warningCount === 1) {
+          warningBadge = `<span class="text-xs font-semibold bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">⚠️ 1 / 3 Warning</span>`;
+        } else {
+          warningBadge = `<span class="text-xs font-medium bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">0 / 3 Clean</span>`;
+        }
+
+        return `
+          <tr class="hover:bg-slate-50 text-xs">
+            <td class="p-2.5 font-mono font-bold text-center text-slate-600">#${index + 1}</td>
+            <td class="p-2.5 font-medium text-slate-900">
+              <div class="flex items-center space-x-1.5">
+                <span>${p.displayName}</span>
+                ${p.status === 'disconnected' ? '<span class="text-[10px] text-amber-600">(Away)</span>' : ''}
+              </div>
+            </td>
+            <td class="p-2.5 text-right font-mono font-bold text-blue-950 text-sm">${p.score || 0} pts</td>
+            <td class="p-2.5 text-center">${warningBadge}</td>
+          </tr>
+        `;
+      }).join('');
     }
   }
 
