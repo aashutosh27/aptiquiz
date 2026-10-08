@@ -78,10 +78,11 @@ export function setupSocketIO(server) {
         } catch (err) {
           logger.error({ handlerName, err }, 'Socket handler error');
           const userErr = formatErrorForUser(err);
-          socket.emit('error:notice', userErr);
           const lastArg = args[args.length - 1];
           if (typeof lastArg === 'function') {
             lastArg({ success: false, error: userErr });
+          } else {
+            socket.emit('error:notice', userErr);
           }
         }
       };
