@@ -24,7 +24,7 @@
       <button id="btn-dashboard" onclick="app.goToDashboard()" class="px-2 py-1 bg-blue-900 text-white font-semibold rounded hover:bg-blue-950 text-xs">🏠 Dashboard</button>
       <button id="btn-text-toggle" onclick="app.toggleLargeText()" class="px-2 py-1 border border-slate-300 rounded hover:bg-slate-100 text-xs">Aa Text</button>
       <button id="btn-sound-toggle" onclick="app.toggleSound()" class="px-2 py-1 border border-slate-300 rounded hover:bg-slate-100 text-xs">Sound: ON</button>
-      <a href="#league" onclick="app.showScreen('league')" class="text-blue-900 hover:underline px-2 py-1 font-medium text-xs">League</a>
+      <a href="#league" onclick="app.renderLeague()" class="text-blue-900 hover:underline px-2 py-1 font-medium text-xs">League</a>
       <button id="btn-logout" onclick="app.logout()" class="hidden text-red-600 hover:underline px-2 py-1 text-xs">Sign Out</button>
     </div>
   </header>
@@ -318,8 +318,8 @@
         </div>
 
         <!-- Large QR Code for projection -->
-        <div class="flex flex-col items-center justify-center my-4">
-          <div id="lobby-qrcode" class="p-2 bg-white border border-slate-300 rounded"></div>
+        <div class="flex flex-col items-center justify-center my-2">
+          <div id="lobby-qrcode" class="hidden p-2 bg-white border border-slate-300 rounded"></div>
         </div>
 
         <!-- Separate Dashboard Sharing URLs for Host -->
@@ -584,29 +584,76 @@
 
       <!-- 14. COLLEGE LEAGUE SCREEN -->
       <section id="screen-league" class="hidden space-y-6">
-        <h1 class="text-2xl font-bold text-center">College League Standings</h1>
-        <p class="text-xs text-center text-slate-500">Colleges ranked by top 5 players' average score.</p>
+        <div class="flex justify-between items-center border-b pb-3">
+          <h1 class="text-xl font-bold text-slate-900">College League Standings</h1>
+          <button onclick="app.goToDashboard()" class="btn-outline text-xs px-2.5 py-1">Back to Dashboard</button>
+        </div>
+        <p class="text-xs text-slate-500">Live student score standings for active quiz rooms.</p>
         
-        <div class="border rounded divide-y bg-white" id="league-list">
-          <div class="p-3 flex justify-between font-bold bg-slate-100 text-xs">
-            <span>College</span>
-            <span>Avg Points</span>
+        <div class="border rounded divide-y bg-white overflow-hidden" id="league-list">
+          <div class="p-3 flex justify-between font-bold bg-slate-100 text-xs text-slate-700 uppercase">
+            <span>Rank & Player / Institution</span>
+            <span>Score</span>
           </div>
-          <div class="p-3 flex justify-between text-sm">
-            <span>1. IIT Bombay (IITB)</span>
-            <span>942 pts</span>
+          <div id="league-items-body" class="divide-y"></div>
+        </div>
+
+        <button onclick="app.goToDashboard()" class="btn-outline w-full text-sm">Back to Dashboard</button>
+      </section>
+
+      <!-- 15. HOST LIVE CONTROL & LEADERBOARD DASHBOARD SCREEN -->
+      <section id="screen-host-live" class="hidden space-y-6">
+        <!-- Status Banner -->
+        <div class="bg-blue-950 text-white p-4 rounded-lg flex justify-between items-center shadow-md">
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span class="text-xs uppercase font-mono tracking-widest text-emerald-300 font-bold">Quiz is Started & Live</span>
+            </div>
+            <h2 class="text-lg font-bold mt-1">Question <span id="host-live-q-num">1</span> of <span id="host-live-q-total">10</span></h2>
           </div>
-          <div class="p-3 flex justify-between text-sm">
-            <span>2. BITS Pilani (BITS)</span>
-            <span>910 pts</span>
-          </div>
-          <div class="p-3 flex justify-between text-sm">
-            <span>3. NIT Trichy (NITT)</span>
-            <span>885 pts</span>
+          <div class="text-right">
+            <span id="host-live-timer" class="text-2xl font-mono font-bold text-yellow-400 block">15.0s</span>
+            <span class="text-xs text-blue-200 font-mono">Time Remaining</span>
           </div>
         </div>
 
-        <button onclick="app.showScreen('join')" class="btn-outline w-full">Back to Join</button>
+        <!-- Live Question Info & Answer Progress -->
+        <div class="bg-white p-4 border border-slate-300 rounded-lg space-y-3 shadow-sm">
+          <p id="host-live-q-text" class="font-bold text-slate-900 text-sm"></p>
+          <div class="flex items-center justify-between text-xs text-slate-600 bg-slate-50 p-2.5 rounded border">
+            <span>Progress: <strong id="host-live-answered-count" class="text-slate-900">0</strong> / <strong id="host-live-total-players" class="text-slate-900">0</strong> Players Answered</span>
+            <span id="host-live-topic-badge" class="font-mono uppercase text-blue-900 font-semibold bg-blue-50 px-2 py-0.5 rounded border border-blue-200"></span>
+          </div>
+        </div>
+
+        <!-- Host Live Control Buttons -->
+        <div class="grid grid-cols-3 gap-2 text-xs">
+          <button onclick="app.hostNextOrReveal()" class="btn-navy py-2 px-2 text-center shadow-sm">⏭️ Next / Reveal Answer</button>
+          <button onclick="app.toggleLockRoom()" class="btn-outline py-2 px-2 text-center">🔒 Lock / Pause Room</button>
+          <button onclick="app.copyProctorUrl()" class="btn-outline py-2 px-2 text-center">🛡️ Proctor Panel</button>
+        </div>
+
+        <!-- Live Leaderboard Table -->
+        <div class="space-y-2">
+          <div class="flex justify-between items-center">
+            <h3 class="font-bold text-slate-800 text-sm uppercase tracking-wide">🏆 Live Room Leaderboard</h3>
+            <span class="text-xs text-slate-500 font-mono">Real-Time Score Standings</span>
+          </div>
+
+          <table class="w-full border-collapse text-sm bg-white border rounded">
+            <thead>
+              <tr class="border-b bg-slate-100 text-left text-xs uppercase text-slate-600">
+                <th class="p-2">Rank</th>
+                <th class="p-2">Player</th>
+                <th class="p-2 text-right">Score</th>
+              </tr>
+            </thead>
+            <tbody id="host-live-leaderboard-body" class="divide-y">
+              <tr><td colspan="3" class="p-3 text-center text-slate-400 text-xs italic">Waiting for player responses...</td></tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
     </div>

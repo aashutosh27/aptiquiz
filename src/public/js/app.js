@@ -388,6 +388,18 @@ class AptiApp {
     this.instructionsSeen = false;
     this.showScreen('lobby');
     document.getElementById('lobby-pin').innerText = snapshot.pin;
+    const shareUrl = `${window.location.origin}/j/${snapshot.pin}`;
+    const shareEl = document.getElementById('lobby-share-url');
+    if (shareEl) shareEl.innerText = shareUrl;
+
+    const qrBox = document.getElementById('lobby-qrcode');
+    if (window.QRCode && snapshot.pin && qrBox) {
+      qrBox.innerHTML = '';
+      qrBox.classList.remove('hidden');
+      QRCode.render(qrBox, shareUrl);
+    } else if (qrBox) {
+      qrBox.classList.add('hidden');
+    }
 
     const hostControls = document.getElementById('host-controls');
     const isHost = this.user && (Number(snapshot.hostId) === Number(this.user.id) || this.user.role === 'host');
@@ -492,6 +504,16 @@ class AptiApp {
   }
 
   renderQuestion(q) {
+    const isHost = this.user && (
+      (this.currentRoom && Number(this.currentRoom.hostId) === Number(this.user.id)) ||
+      this.user.role === 'host'
+    );
+
+    if (isHost) {
+      this.renderHostLiveDashboard(q);
+      return;
+    }
+
     if (!this.instructionsSeen) {
       this.instructionsSeen = true;
       this.pendingQuestionData = q;
@@ -499,6 +521,112 @@ class AptiApp {
       return;
     }
     this.proceedToRenderQuestion(q);
+  }
+
+  renderHostLiveDashboard(q) {
+    this.showScreen('host-live');
+    this.hostLiveCurrentQ = q;
+
+    const qNum = document.getElementById('host-live-q-num');
+    const qTotal = document.getElementById('host-live-q-total');
+    const qText = document.getElementById('host-live-q-text');
+    const topicBadge = document.getElementById('host-live-topic-badge');
+
+    if (qNum) qNum.innerText = q.currentQuestionIndex || 1;
+    if (qTotal) qTotal.innerText = q.totalQuestions || 10;
+    if (qText) qText.innerText = q.text || '';
+    if (topicBadge) topicBadge.innerText = q.topic || 'Quantitative';
+
+    this.startHostCountdown(q.durationMs || 15000);
+    this.updateHostLiveStats();
+  }
+
+  startHostCountdown(durationMs) {
+    const timerText = document.getElementById('host-live-timer');
+    const start = performance.now();
+
+    if (this.hostTimerInterval) clearInterval(this.hostTimerInterval);
+
+    this.hostTimerInterval = setInterval(() => {
+      const elapsed = performance.now() - start;
+      const remainingMs = Math.max(0, durationMs - elapsed);
+      const remainingSec = (remainingMs / 1000).toFixed(1);
+
+      if (timerText) timerText.innerText = `${remainingSec}s`;
+
+      if (remainingMs <= 0) {
+        clearInterval(this.hostTimerInterval);
+      }
+    }, 100);
+  }
+
+  updateHostLiveStats() {
+    if (!this.currentRoom) return;
+
+    const answeredCountEl = document.getElementById('host-live-answered-count');
+    const totalPlayersEl = document.getElementById('host-live-total-players');
+    const lbBody = document.getElementById('host-live-leaderboard-body');
+
+    const playersList = Array.from(this.currentRoom.players ? this.currentRoom.players.values() : [])
+      .filter((p) => Number(p.userId) !== Number(this.currentRoom.hostId) && p.status !== 'disqualified')
+      .sort((a, b) => b.score - a.score);
+
+    if (totalPlayersEl) totalPlayersEl.innerText = playersList.length;
+
+    const answeredSize = this.lastLeaderboardData?.top10?.length || 0;
+    if (answeredCountEl) answeredCountEl.innerText = Math.min(playersList.length, answeredSize);
+
+    if (lbBody) {
+      if (playersList.length === 0) {
+        lbBody.innerHTML = `<tr><td colspan="3" class="p-3 text-center text-slate-400 text-xs italic">Waiting for student players to join room...</td></tr>`;
+        return;
+      }
+
+      lbBody.innerHTML = playersList.map((p, index) => `
+        <tr class="hover:bg-slate-50">
+          <td class="p-2 font-mono font-bold text-slate-600">${index + 1}</td>
+          <td class="p-2 font-medium text-slate-900 flex items-center space-x-1">
+            <span>${p.displayName}</span>
+            ${p.status === 'disconnected' ? '<span class="text-[10px] text-amber-600 font-normal">(Away)</span>' : ''}
+          </td>
+          <td class="p-2 text-right font-mono font-bold text-blue-950">${p.score} pts</td>
+        </tr>
+      `).join('');
+    }
+  }
+
+  hostNextOrReveal() {
+    if (this.currentRoom) {
+      this.socket.emit('host:start_game');
+    }
+  }
+
+  renderLeague() {
+    this.showScreen('league');
+    const container = document.getElementById('league-items-body');
+    if (!container) return;
+
+    if (this.currentRoom && this.currentRoom.players) {
+      const activePlayers = Array.from(this.currentRoom.players.values())
+        .filter((p) => Number(p.userId) !== Number(this.currentRoom.hostId) && p.status !== 'disqualified')
+        .sort((a, b) => b.score - a.score);
+
+      if (activePlayers.length > 0) {
+        container.innerHTML = activePlayers.map((p, idx) => `
+          <div class="p-3 flex justify-between items-center text-sm hover:bg-slate-50">
+            <span class="font-medium text-slate-900">${idx + 1}. ${p.displayName}</span>
+            <span class="font-bold font-mono text-blue-950">${p.score} pts</span>
+          </div>
+        `).join('');
+        return;
+      }
+    }
+
+    container.innerHTML = `
+      <div class="p-6 text-center text-slate-500 text-xs italic">
+        No active league standings recorded yet. Host or join a live room to compete on the standings leaderboard!
+      </div>
+    `;
   }
 
   renderInstructions(q) {
