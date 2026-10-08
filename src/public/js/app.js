@@ -28,6 +28,7 @@ class AptiApp {
     await this.checkAuth();
     this.initSocket();
     this.routeUrl();
+    window.addEventListener('hashchange', () => this.routeUrl());
   }
 
   routeUrl() {
@@ -203,9 +204,22 @@ class AptiApp {
   showScreen(screenId) {
     document.querySelectorAll('main section').forEach((sec) => sec.classList.add('hidden'));
     const target = document.getElementById(`screen-${screenId}`);
+    const cardWrapper = document.getElementById('main-card-wrapper');
+
+    if (cardWrapper) {
+      if (['proctor', 'host-live', 'editor', 'spectator', 'league', 'question', 'results'].includes(screenId)) {
+        cardWrapper.className = 'w-full max-w-4xl bg-white border border-slate-200 rounded-lg p-4 sm:p-6 shadow-sm transition-all duration-150';
+      } else {
+        cardWrapper.className = 'w-full max-w-xl bg-white border border-slate-200 rounded-lg p-4 sm:p-6 shadow-sm transition-all duration-150';
+      }
+    }
+
     if (target) {
       target.classList.remove('hidden');
-      window.location.hash = screenId;
+      const currentHash = window.location.hash.replace('#', '');
+      if (!currentHash.startsWith('proctor:') && !currentHash.startsWith('spectator:')) {
+        window.location.hash = screenId;
+      }
     }
   }
 
