@@ -104,7 +104,7 @@ export function setupSocketIO(server) {
 
       room.checkCanJoin(socket.user, !!parsed.inviteToken);
 
-      const { player, takeover } = room.addPlayer(
+      const { player, isHost, takeover } = room.addPlayer(
         socket.user,
         socket.id,
         !socket.user.email
@@ -121,13 +121,15 @@ export function setupSocketIO(server) {
         socket.emit('room:state', snapshot);
       }
 
-      // Broadcast join/rejoin to room
-      io.to(`room_${room.id}`).emit('room:player_joined', {
-        userId: player.userId,
-        displayName: player.displayName,
-        totalPlayers: room.players.size,
-        takeover,
-      });
+      // Broadcast join/rejoin to room for student players
+      if (!isHost && player) {
+        io.to(`room_${room.id}`).emit('room:player_joined', {
+          userId: player.userId,
+          displayName: player.displayName,
+          totalPlayers: room.players.size,
+          takeover,
+        });
+      }
     }));
 
     // --- ROOM REJOIN ---

@@ -176,7 +176,20 @@ app.post('/api/rooms', (req, res, next) => {
   }
 });
 
-// Global 404 Catch-All Handler
+// Serve Index HTML for Join Links & Single Page App Routes
+app.get(['/j/:token', '/join/:token', '/j', '/join'], (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Serve index.html for all non-API frontend routes
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api') || req.path.startsWith('/health')) {
+    return next();
+  }
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Global 404 Catch-All Handler for API
 app.use((req, res, next) => {
   res.status(404).json({
     code: 'ROOM_NOT_FOUND',

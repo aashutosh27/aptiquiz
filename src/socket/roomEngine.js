@@ -23,6 +23,7 @@ export class Room {
     this.pin = pin;
     this.inviteToken = inviteToken;
     this.inviteTokenHash = hashToken(inviteToken);
+    this.hostId = Number(hostId);
     this.questionSet = (questionSet || []).map((q, idx) => ({
       ...q,
       id: q.id !== undefined && q.id !== null ? Number(q.id) : idx + 1,
@@ -81,7 +82,7 @@ export class Room {
     }
 
     // 4. Room not full at 50
-    const regularPlayers = Array.from(this.players.values()).filter(p => p.userId !== this.hostId);
+    const regularPlayers = Array.from(this.players.values()).filter(p => Number(p.userId) !== Number(this.hostId));
     if (regularPlayers.length >= 50) {
       if (!existingPlayer) {
         throw new AppError('ROOM_FULL');
@@ -92,6 +93,12 @@ export class Room {
   }
 
   addPlayer(user, socketId, isGuest = false) {
+    // Exclude Host from student players contestant map
+    if (user && (Number(user.id) === Number(this.hostId) || user.role === 'host')) {
+      this.hostSocketId = socketId;
+      return { player: null, isHost: true, takeover: false };
+    }
+
     const existing = this.players.get(user.id);
 
     if (existing) {
@@ -102,7 +109,7 @@ export class Room {
       existing.socketId = socketId;
       existing.status = 'active';
       existing.lastSeenAt = Date.now();
-      return { player: existing, takeover: true };
+      return { player: existing, isHost: false, takeover: true };
     }
 
     const player = {
@@ -121,7 +128,7 @@ export class Room {
     };
 
     this.players.set(user.id, player);
-    return { player, takeover: false };
+    return { player, isHost: false, takeover: false };
   }
 
   disconnectPlayer(socketId) {

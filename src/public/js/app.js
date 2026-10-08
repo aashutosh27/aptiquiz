@@ -33,10 +33,26 @@ class AptiApp {
   routeUrl() {
     const hash = window.location.hash.replace('#', '');
     const path = window.location.pathname;
+    const urlParams = new URLSearchParams(window.location.search);
+    const pinQuery = urlParams.get('pin');
 
-    if (path.startsWith('/j/')) {
-      const inviteToken = path.split('/j/')[1];
-      this.handleInviteLink(inviteToken);
+    if (path.startsWith('/j/') || path.startsWith('/join/')) {
+      const token = path.replace(/^\/(j|join)\//, '').trim();
+      if (token) {
+        this.pendingToken = token;
+      }
+    } else if (pinQuery) {
+      this.pendingToken = pinQuery.trim();
+    }
+
+    if (this.pendingToken) {
+      const pinInput = document.getElementById('join-pin');
+      if (pinInput) pinInput.value = this.pendingToken;
+      if (this.user) {
+        this.handleInviteLink(this.pendingToken);
+      } else {
+        this.showScreen('signin');
+      }
       return;
     }
 
@@ -69,6 +85,9 @@ class AptiApp {
         const data = await res.json();
         this.user = data.user;
         this.updateUserBadge();
+        if (this.pendingToken) {
+          this.handleInviteLink(this.pendingToken);
+        }
       }
     } catch (e) {}
   }
@@ -99,7 +118,11 @@ class AptiApp {
       this.user = data.user;
       this.updateUserBadge();
       this.initSocket();
-      this.showScreen('join');
+      if (this.pendingToken) {
+        this.handleInviteLink(this.pendingToken);
+      } else {
+        this.showScreen('join');
+      }
     }
   }
 
@@ -328,14 +351,26 @@ class AptiApp {
     });
   }
 
-  handleInviteLink(inviteToken) {
+  handleInviteLink(token) {
+    if (!token) return;
     this.showScreen('join');
-    this.socket.emit('room:join', { inviteToken }, (response) => {
+
+    const isSixDigit = /^\d{6}$/.test(token);
+    const payload = isSixDigit ? { pin: token } : { inviteToken: token };
+
+    if (!this.socket) this.initSocket();
+
+    this.socket.emit('room:join', payload, (response) => {
       if (response && response.success) {
         this.currentRoom = response.snapshot;
-        this.renderLobby(response.snapshot);
+        this.pendingToken = null;
+        if (response.snapshot.status === 'LOBBY') {
+          this.renderLobby(response.snapshot);
+        } else {
+          this.showScreen('question');
+        }
       } else {
-        this.showError('Invalid or expired invite link.');
+        this.showError(response?.error?.message || 'Invalid or expired room link.');
       }
     });
   }
