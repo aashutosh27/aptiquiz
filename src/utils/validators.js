@@ -71,13 +71,7 @@ export const submitAnswerPayloadSchema = z.object({
 
 export const warnPlayerPayloadSchema = z.object({
   targetUserId: z.number().int().positive(),
-  reason: z.enum([
-    'suspicious answering',
-    'switching devices or tabs',
-    'sharing answers',
-    'abusive name or behaviour',
-    'other',
-  ]),
+  reason: z.string().min(1, 'Reason is required.').max(200),
   customReasonText: z.string().max(100).optional(),
 });
 
