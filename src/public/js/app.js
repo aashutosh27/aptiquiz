@@ -405,6 +405,11 @@ class AptiApp {
 
   handleInviteLink(token) {
     if (!token) return;
+    this.pendingToken = null;
+    if (window.history && window.history.replaceState) {
+      window.history.replaceState({}, document.title, '/');
+    }
+
     this.showScreen('join');
 
     const isSixDigit = /^\d{6}$/.test(token);
@@ -412,19 +417,26 @@ class AptiApp {
 
     if (!this.socket) this.initSocket();
 
-    this.socket.emit('room:join', payload, (response) => {
-      if (response && response.success) {
-        this.currentRoom = response.snapshot;
-        this.pendingToken = null;
-        if (response.snapshot.status === 'LOBBY') {
-          this.renderLobby(response.snapshot);
+    const executeJoin = () => {
+      this.socket.emit('room:join', payload, (response) => {
+        if (response && response.success) {
+          this.currentRoom = response.snapshot;
+          if (response.snapshot.status === 'LOBBY') {
+            this.renderLobby(response.snapshot);
+          } else {
+            this.showScreen('question');
+          }
         } else {
-          this.showScreen('question');
+          this.showError(response?.error?.message || 'Invalid or expired room link.');
         }
-      } else {
-        this.showError(response?.error?.message || 'Invalid or expired room link.');
-      }
-    });
+      });
+    };
+
+    if (this.socket.connected) {
+      executeJoin();
+    } else {
+      this.socket.once('connect', executeJoin);
+    }
   }
 
   renderLobby(snapshot) {
@@ -637,7 +649,12 @@ class AptiApp {
 
   // --- SEPARATE DASHBOARD COPY & SHARE URLS ---
   copyLink() {
-    const url = `${window.location.origin}/j/${this.currentRoom?.inviteToken || this.currentRoom?.pin}`;
+    const pin = this.currentRoom?.pin;
+    if (!pin) {
+      this.showError('PIN not available for this room.');
+      return;
+    }
+    const url = `${window.location.origin}/j/${pin}`;
     navigator.clipboard.writeText(url);
     alert('Player Join Link copied to clipboard:\n' + url);
   }

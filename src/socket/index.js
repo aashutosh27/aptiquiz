@@ -153,7 +153,7 @@ export function setupSocketIO(server) {
       const isHost = Number(room.hostId) === Number(socket.user.id) || socket.user.role === 'host';
       const existingPlayer = room.getPlayer(socket.user.id);
 
-      if (!isHost && !isProctor && !socket.isProctor && !existingPlayer) {
+      if (!isHost && !isProctor && !socket.isProctor && !socket.isSpectator && !existingPlayer) {
         throw new AppError('ROOM_NOT_FOUND');
       }
 
