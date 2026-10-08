@@ -469,7 +469,11 @@ class AptiApp {
   }
 
   renderRoomState(snapshot) {
+    const existingCode = this.currentRoom?.proctorCode;
     this.currentRoom = snapshot;
+    if (existingCode && !this.currentRoom.proctorCode) {
+      this.currentRoom.proctorCode = existingCode;
+    }
     if (snapshot.status === 'LOBBY') {
       this.renderLobby(snapshot);
     }
@@ -483,9 +487,13 @@ class AptiApp {
     if (this.currentRoom) {
       const roomId = this.currentRoom.roomId || this.currentRoom.id;
       const pin = this.currentRoom.pin;
+      const existingCode = this.currentRoom.proctorCode;
       this.socket.emit('room:rejoin', { roomId, pin }, (res) => {
         if (res && res.success && res.snapshot) {
           this.currentRoom = res.snapshot;
+          if (existingCode && !this.currentRoom.proctorCode) {
+            this.currentRoom.proctorCode = existingCode;
+          }
           const proctorScreen = document.getElementById('screen-proctor');
           if (proctorScreen && !proctorScreen.classList.contains('hidden')) {
             this.renderProctorRoster();
@@ -513,10 +521,15 @@ class AptiApp {
   }
 
   copyProctorUrl() {
-    const code = this.currentRoom?.proctorCode || 'PROCTOR';
-    const url = `${window.location.origin}/#proctor:${this.currentRoom?.pin}?code=${code}`;
+    const code = this.currentRoom?.proctorCode;
+    if (!code) {
+      this.showError('Proctor Code not available for this room.');
+      return;
+    }
+    const pin = this.currentRoom?.pin || '';
+    const url = `${window.location.origin}/#proctor:${pin}?code=${code}`;
     navigator.clipboard.writeText(url);
-    alert('Proctor / Referee Panel URL copied:\n' + url);
+    alert(`Proctor / Referee Panel URL copied (Referee Code: ${code}):\n` + url);
   }
 
   toggleLockRoom() {
@@ -584,6 +597,9 @@ class AptiApp {
       this.socket.emit('room:join', { pin: targetPin.trim() }, (joinRes) => {
         if (joinRes && joinRes.success) {
           this.currentRoom = joinRes.snapshot;
+          if (targetCode) {
+            this.currentRoom.proctorCode = targetCode.trim().toUpperCase();
+          }
 
           this.socket.emit('proctor:auth', { proctorCode: targetCode.trim(), pin: targetPin.trim() }, (authRes) => {
             if (authRes && authRes.success) {

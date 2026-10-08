@@ -172,6 +172,8 @@ export class Room {
     return {
       roomId: this.id,
       pin: this.pin,
+      proctorCode: this.proctorCode,
+      inviteToken: this.inviteToken,
       status: this.status,
       currentQuestionIndex: this.currentQuestionIndex,
       totalQuestions: this.questionSet.length,
