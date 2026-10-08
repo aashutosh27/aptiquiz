@@ -551,72 +551,83 @@ class AptiApp {
     const countEl = document.getElementById('proctor-player-count');
     if (!list) return;
 
-    if (!this.currentRoom || !this.currentRoom.players || this.currentRoom.players.length === 0) {
-      list.innerHTML = `<div class="p-4 text-center text-xs text-slate-400 italic">No players connected to this room.</div>`;
+    if (!this.currentRoom || !this.currentRoom.players) {
+      list.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-xs text-slate-400 italic">No players connected to this room.</td></tr>`;
       if (countEl) countEl.innerText = '0';
       return;
     }
 
     const hostId = Number(this.currentRoom.hostId);
-    const players = this.currentRoom.players.filter(p => Number(p.userId) !== hostId);
+    const rawPlayers = Array.isArray(this.currentRoom.players)
+      ? this.currentRoom.players
+      : Array.from(this.currentRoom.players.values());
+
+    const players = rawPlayers
+      .filter((p) => Number(p.userId) !== hostId)
+      .sort((a, b) => (b.score || 0) - (a.score || 0));
+
     if (countEl) countEl.innerText = players.length;
 
     if (players.length === 0) {
-      list.innerHTML = `<div class="p-4 text-center text-xs text-slate-400 italic">No student players joined yet.</div>`;
+      list.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-xs text-slate-400 italic">No student players joined yet.</td></tr>`;
       return;
     }
 
-    list.innerHTML = players.map(p => {
-      const isDisqualified = p.status === 'disqualified';
-      const warningCount = p.warningCount || 0;
-      
-      let badgeHtml = '';
-      if (isDisqualified) {
-        badgeHtml = `<span class="text-xs font-bold bg-rose-100 text-rose-800 px-2 py-0.5 rounded">🚫 Disqualified (3/3)</span>`;
-      } else if (warningCount > 0) {
-        badgeHtml = `<span class="text-xs font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded">⚠️ ${warningCount}/3 Warnings</span>`;
-      } else {
-        badgeHtml = `<span class="text-xs font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">✓ Clean (0/3)</span>`;
-      }
+    list.innerHTML = players
+      .map((p, idx) => {
+        const isDisqualified = p.status === 'disqualified';
+        const warningCount = p.warningCount || 0;
+        const rank = idx + 1;
 
-      const actionsHtml = isDisqualified ? `
-        <button onclick="app.proctorReinstate(${p.userId})" class="btn-outline text-xs px-2 py-1 text-emerald-700 border-emerald-300 hover:bg-emerald-50">
-          🔄 Reinstate Player
-        </button>
-      ` : `
-        <button onclick="app.proctorWarn(${p.userId}, '${(p.displayName || '').replace(/'/g, "\\'")}')" class="btn-outline text-xs px-2 py-1 text-amber-800 border-amber-300 hover:bg-amber-50">
-          ⚠️ Warn Player
-        </button>
-        <button onclick="app.proctorKick(${p.userId}, '${(p.displayName || '').replace(/'/g, "\\'")}')" class="btn-outline text-xs px-2 py-1 text-rose-700 border-rose-300 hover:bg-rose-50">
-          🚫 Ban / Kick
-        </button>
-      `;
+        let warningBadge = '';
+        if (isDisqualified) {
+          warningBadge = `<span class="text-xs font-bold bg-rose-100 text-rose-800 px-2 py-0.5 rounded-full">🚫 Disqualified (3/3)</span>`;
+        } else if (warningCount === 2) {
+          warningBadge = `<span class="text-xs font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">⚠️⚠️ 2 / 3 Warnings</span>`;
+        } else if (warningCount === 1) {
+          warningBadge = `<span class="text-xs font-semibold bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">⚠️ 1 / 3 Warning</span>`;
+        } else {
+          warningBadge = `<span class="text-xs font-medium bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">0 / 3 Clean</span>`;
+        }
 
-      return `
-        <div class="p-3 flex items-center justify-between hover:bg-slate-50 text-xs">
-          <div class="space-y-1">
-            <div class="flex items-center space-x-2">
-              <span class="font-bold text-slate-900 text-sm">${p.displayName}</span>
-              ${badgeHtml}
-            </div>
-            <p class="text-slate-500 font-mono">User ID: ${p.userId} | Score: ${p.score || 0} pts ${p.status === 'disconnected' ? '| (Away)' : ''}</p>
-          </div>
-          <div class="flex items-center space-x-1.5">
-            ${actionsHtml}
-          </div>
-        </div>
-      `;
-    }).join('');
+        const actionsHtml = isDisqualified
+          ? `
+          <button onclick="app.proctorReinstate(${p.userId})" class="btn-outline text-xs px-2.5 py-1 text-emerald-700 border-emerald-300 hover:bg-emerald-50 font-semibold">
+            🔄 Reinstate Player
+          </button>
+        `
+          : `
+          <button onclick="app.proctorWarnCheating(${p.userId}, '${(p.displayName || '').replace(/'/g, "\\'")}')" class="btn-outline text-xs px-2.5 py-1 text-amber-900 bg-amber-50 border-amber-300 hover:bg-amber-100 font-bold shadow-sm">
+            ⚠️ Warn for Cheating
+          </button>
+        `;
+
+        return `
+          <tr class="${isDisqualified ? 'bg-rose-50/50 opacity-75' : 'hover:bg-slate-50'} text-xs">
+            <td class="p-2.5 font-mono font-bold text-center text-slate-600">#${rank}</td>
+            <td class="p-2.5 font-medium text-slate-900">
+              <div class="flex items-center space-x-1.5">
+                <span>${p.displayName}</span>
+                ${p.status === 'disconnected' ? '<span class="text-[10px] text-amber-600">(Away)</span>' : ''}
+              </div>
+            </td>
+            <td class="p-2.5 text-right font-mono font-bold text-blue-950 text-sm">${p.score || 0} pts</td>
+            <td class="p-2.5 text-center">${warningBadge}</td>
+            <td class="p-2.5 text-right space-x-1">${actionsHtml}</td>
+          </tr>
+        `;
+      })
+      .join('');
   }
 
-  proctorWarn(targetUserId, displayName) {
+  proctorWarnCheating(targetUserId, displayName) {
     const reasons = [
-      'Tab switching detected / Left test window',
-      'Multiple devices / Suspicious activity',
-      'Off-screen behavior / Unauthorized assistance',
-      'Other proctoring rule violation'
+      'Cheating / Tab switching detected',
+      'Suspicious off-screen behavior',
+      'Multiple devices / Unauthorized assistance',
+      'Proctoring rule violation'
     ];
-    const selected = prompt(`Select reason to warn ${displayName}:\n\n1. ${reasons[0]}\n2. ${reasons[1]}\n3. ${reasons[2]}\n4. ${reasons[3]}\n\nEnter number (1-4) or type custom reason:`, '1');
+    const selected = prompt(`Issue Warning to ${displayName} for Cheating:\n\n1. ${reasons[0]}\n2. ${reasons[1]}\n3. ${reasons[2]}\n4. ${reasons[3]}\n\nEnter number (1-4) or type custom reason:`, '1');
 
     if (!selected) return;
 
@@ -628,12 +639,16 @@ class AptiApp {
 
     this.socket.emit('proctor:warn_player', { targetUserId, reason }, (res) => {
       if (res && res.success) {
-        alert(`Warning issued to ${displayName}.`);
+        alert(`Warning issued to ${displayName}. (At 3 warnings player will be disqualified).`);
         this.refreshProctorRoster();
       } else if (res && res.error) {
         this.showError(res.error.message || 'Failed to issue warning.');
       }
     });
+  }
+
+  proctorWarn(targetUserId, displayName) {
+    this.proctorWarnCheating(targetUserId, displayName);
   }
 
   proctorKick(targetUserId, displayName) {
