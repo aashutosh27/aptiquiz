@@ -8,6 +8,8 @@
   <link rel="stylesheet" href="/css/style.css">
   <script src="/socket.io/socket.io.js"></script>
   <script src="/js/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body class="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
@@ -644,7 +646,12 @@
 
         <!-- Final Summary Leaderboard -->
         <div class="space-y-2">
-          <h2 class="text-xs font-bold uppercase tracking-wider text-slate-700">Final Room Standings</h2>
+          <div class="flex justify-between items-center">
+            <h2 class="text-xs font-bold uppercase tracking-wider text-slate-700">Final Room Standings</h2>
+            <button id="btn-download-pdf-scorecard" onclick="app.downloadPdfScorecard()" class="hidden btn-outline text-xs px-3 py-1 flex items-center space-x-1 border-blue-300 text-blue-900 bg-blue-50 hover:bg-blue-100 font-bold shadow-sm">
+              <span>📄 Download PDF Scorecard</span>
+            </button>
+          </div>
           <table class="w-full border-collapse text-sm bg-white border rounded">
             <thead>
               <tr class="border-b bg-slate-100 text-left text-xs uppercase text-slate-600">

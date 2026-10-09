@@ -1402,6 +1402,22 @@ class AptiApp {
     const summary = data?.summary;
     if (!summary) return;
 
+    this.lastFinishedSummary = summary;
+
+    const isHost = this.user && (
+      (this.currentRoom && Number(this.currentRoom.hostId) === Number(this.user.id)) ||
+      this.user.role === 'host'
+    );
+
+    const pdfBtn = document.getElementById('btn-download-pdf-scorecard');
+    if (pdfBtn) {
+      if (isHost) {
+        pdfBtn.classList.remove('hidden');
+      } else {
+        pdfBtn.classList.add('hidden');
+      }
+    }
+
     // Render my performance stats
     if (summary.myStats) {
       const s = summary.myStats;
@@ -1469,6 +1485,133 @@ class AptiApp {
           .join('');
       }
     }
+  }
+
+  downloadPdfScorecard() {
+    const summary = this.lastFinishedSummary;
+    if (!summary || !summary.fullRankings || summary.fullRankings.length === 0) {
+      this.showError('No final room standings available to download.');
+      return;
+    }
+
+    const quizTitle = this.currentRoom?.settings?.title || 'AptiQuiz Room';
+    const pin = this.currentRoom?.pin || '------';
+    const timestamp = new Date().toLocaleString();
+
+    const rows = summary.fullRankings.map((p, idx) => [
+      `#${idx + 1}`,
+      p.displayName || 'Player',
+      `${p.score || 0} pts`
+    ]);
+
+    if (window.jspdf && window.jspdf.jsPDF) {
+      try {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(18);
+        doc.setTextColor(15, 23, 42);
+        doc.text('AptiQuiz — Final Room Scorecard', 14, 20);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10);
+        doc.setTextColor(71, 85, 105);
+        doc.text(`Quiz Title: ${quizTitle}`, 14, 28);
+        doc.text(`Room PIN: ${pin}  |  Generated: ${timestamp}`, 14, 34);
+
+        if (doc.autoTable) {
+          doc.autoTable({
+            startY: 40,
+            head: [['Rank', 'Player Name', 'Score']],
+            body: rows,
+            theme: 'grid',
+            headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [248, 250, 252] },
+            styles: { fontSize: 10, cellPadding: 4 },
+          });
+        } else {
+          let y = 45;
+          doc.setFont('helvetica', 'bold');
+          doc.text('Rank      Player Name                              Score', 14, y);
+          doc.line(14, y + 2, 196, y + 2);
+          y += 8;
+          doc.setFont('helvetica', 'normal');
+          rows.forEach((row) => {
+            if (y > 280) { doc.addPage(); y = 20; }
+            doc.text(`${row[0].padEnd(10)}${row[1].padEnd(40)}${row[2]}`, 14, y);
+            y += 7;
+          });
+        }
+
+        doc.save(`AptiQuiz_Scorecard_${pin}.pdf`);
+        return;
+      } catch (err) {
+        console.warn('jsPDF export error, falling back to printable window:', err);
+      }
+    }
+
+    const printWin = window.open('', '_blank');
+    if (!printWin) {
+      this.showError('Popup blocker prevented opening PDF print window. Please allow popups.');
+      return;
+    }
+
+    const tableRowsHtml = summary.fullRankings.map((p, idx) => `
+      <tr>
+        <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; font-weight: bold; text-align: center;">#${idx + 1}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #e2e8f0;">${p.displayName}</td>
+        <td style="padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: bold; font-family: monospace;">${p.score || 0} pts</td>
+      </tr>
+    `).join('');
+
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>AptiQuiz Scorecard - ${pin}</title>
+        <style>
+          body { font-family: system-ui, -apple-system, sans-serif; margin: 30px; color: #0f172a; }
+          .header { border-bottom: 2px solid #0f172a; padding-bottom: 12px; margin-bottom: 20px; }
+          h1 { margin: 0 0 6px 0; font-size: 24px; color: #0f172a; }
+          .meta { font-size: 13px; color: #475569; margin-top: 4px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+          th { background-color: #0f172a; color: white; padding: 10px; font-size: 12px; text-transform: uppercase; text-align: left; }
+          th:first-child { text-align: center; }
+          th:last-child { text-align: right; }
+          tr:nth-child(even) { background-color: #f8fafc; }
+          @media print {
+            body { margin: 0; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>AptiQuiz — Final Room Scorecard</h1>
+          <div class="meta"><strong>Quiz Title:</strong> ${quizTitle} | <strong>PIN:</strong> ${pin}</div>
+          <div class="meta"><strong>Generated:</strong> ${timestamp}</div>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 70px; text-align: center;">Rank</th>
+              <th>Player Name</th>
+              <th style="text-align: right;">Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${tableRowsHtml}
+          </tbody>
+        </table>
+        <script>
+          window.onload = function() {
+            window.print();
+          };
+        </script>
+      </body>
+      </html>
+    `);
+    printWin.document.close();
   }
 
   showWarningNotice(data) {
