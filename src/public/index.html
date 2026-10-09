@@ -187,24 +187,7 @@
           <label class="block text-xs font-bold uppercase text-slate-600">Quiz Title</label>
           <input id="set-title" type="text" placeholder="Enter Quiz Title" class="w-full border border-slate-300 p-2 rounded">
           
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
-            <div>
-              <label class="block text-xs font-bold uppercase text-slate-600">Category Topic</label>
-              <select id="set-topic" class="w-full border border-slate-300 p-2 rounded text-sm">
-                <option value="quantitative">Quantitative</option>
-                <option value="logical">Logical Reasoning</option>
-                <option value="verbal">Verbal Reasoning</option>
-                <option value="data_interpretation">Data Interpretation</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-xs font-bold uppercase text-slate-600">Difficulty</label>
-              <select id="set-difficulty" class="w-full border border-slate-300 p-2 rounded text-sm">
-                <option value="easy">Easy</option>
-                <option value="medium" selected>Medium</option>
-                <option value="hard">Hard</option>
-              </select>
-            </div>
+          <div class="grid grid-cols-2 gap-2">
             <div>
               <label class="block text-xs font-bold uppercase text-slate-600">Time / Question</label>
               <select id="set-duration" class="w-full border border-slate-300 p-2 rounded text-sm font-semibold text-blue-950">
@@ -231,6 +214,37 @@
           
           <textarea id="new-q-text" rows="2" placeholder="Enter question text" class="w-full border border-slate-300 p-2 rounded text-sm"></textarea>
           <input id="new-q-image" type="url" placeholder="Question Image URL (optional, e.g. https://...)" class="w-full border border-slate-300 p-2 rounded text-sm">
+
+          <!-- Per-Question Category Topic & Difficulty -->
+          <div class="grid grid-cols-3 gap-2">
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-700">Category Topic</label>
+              <select id="new-q-topic" class="w-full border border-slate-300 p-2 rounded text-sm bg-white font-medium">
+                <option value="quantitative">Quantitative Aptitude</option>
+                <option value="logical">Logical Reasoning</option>
+                <option value="verbal">Verbal Reasoning</option>
+                <option value="data_interpretation">Data Interpretation</option>
+                <option value="general_knowledge">General Knowledge & CS</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-700">Difficulty</label>
+              <select id="new-q-difficulty" class="w-full border border-slate-300 p-2 rounded text-sm bg-white">
+                <option value="easy">Easy</option>
+                <option value="medium" selected>Medium</option>
+                <option value="hard">Hard</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold uppercase text-slate-700">Correct Option</label>
+              <select id="new-correct-opt" class="w-full border border-slate-300 p-2 rounded text-sm bg-white font-semibold">
+                <option value="A">Option A</option>
+                <option value="B">Option B</option>
+                <option value="C">Option C</option>
+                <option value="D">Option D</option>
+              </select>
+            </div>
+          </div>
           
           <div class="grid grid-cols-2 gap-2">
             <div class="space-y-1">
@@ -251,20 +265,11 @@
             </div>
           </div>
 
-          <div class="grid grid-cols-2 gap-2 items-center">
-            <div>
-              <label class="block text-xs font-semibold text-slate-600">Correct Option</label>
-              <select id="new-correct-opt" class="w-full border border-slate-300 p-2 rounded text-sm">
-                <option value="A">Option A</option>
-                <option value="B">Option B</option>
-                <option value="C">Option C</option>
-                <option value="D">Option D</option>
-              </select>
-            </div>
-            <input id="new-explanation" type="text" placeholder="Explanation (optional)" class="border border-slate-300 p-2 rounded text-sm mt-4">
+          <div>
+            <input id="new-explanation" type="text" placeholder="Explanation (optional)" class="w-full border border-slate-300 p-2 rounded text-sm">
           </div>
 
-          <button onclick="app.addCustomQuestion()" class="btn-navy w-full text-sm">+ Add to Quiz Set</button>
+          <button onclick="app.addCustomQuestion()" class="btn-navy w-full text-sm">+ Add Question to Quiz</button>
         </div>
 
         <!-- AI Question Generator by Topic Box -->

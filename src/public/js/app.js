@@ -243,8 +243,8 @@ class AptiApp {
     const optDImg = document.getElementById('new-opt-d-img')?.value.trim() || '';
     const correct = document.getElementById('new-correct-opt').value;
     const explanation = document.getElementById('new-explanation').value.trim();
-    const topic = document.getElementById('set-topic').value;
-    const difficulty = document.getElementById('set-difficulty').value;
+    const topic = document.getElementById('new-q-topic')?.value || 'quantitative';
+    const difficulty = document.getElementById('new-q-difficulty')?.value || 'medium';
 
     if (!text || text.length < 5) {
       this.showError('Enter a valid question text of at least 5 characters.');
@@ -304,23 +304,40 @@ class AptiApp {
       return;
     }
 
+    const topicLabels = {
+      quantitative: 'Quantitative Aptitude',
+      logical: 'Logical Reasoning',
+      verbal: 'Verbal Reasoning',
+      data_interpretation: 'Data Interpretation',
+      general_knowledge: 'General Knowledge & CS',
+    };
+
     container.innerHTML = this.customQuestionsList
-      .map(
-        (q, index) => `
-      <div class="p-3 border border-slate-300 rounded bg-white space-y-2 text-xs">
-        <div class="flex justify-between items-start">
-          <p class="font-bold text-slate-900">${index + 1}. ${q.text}</p>
-          <div class="space-x-1 flex text-xs">
-            <button onclick="app.moveCustomQuestion(${index}, -1)" class="px-2 py-0.5 border rounded hover:bg-slate-100">▲</button>
-            <button onclick="app.moveCustomQuestion(${index}, 1)" class="px-2 py-0.5 border rounded hover:bg-slate-100">▼</button>
-            <button onclick="app.deleteCustomQuestion(${index})" class="px-2 py-0.5 border border-red-200 text-red-600 rounded hover:bg-red-50">Delete</button>
+      .map((q, index) => {
+        const topicName = topicLabels[q.topic] || (q.topic ? q.topic.replace(/_/g, ' ') : 'Quantitative');
+        const diffText = q.difficulty ? q.difficulty.toUpperCase() : 'MEDIUM';
+
+        return `
+          <div class="p-3 border border-slate-300 rounded bg-white space-y-2 text-xs shadow-sm">
+            <div class="flex justify-between items-start gap-2">
+              <div class="space-y-1">
+                <div class="flex items-center space-x-1.5">
+                  <span class="text-[10px] font-bold uppercase bg-blue-100 text-blue-900 px-2 py-0.5 rounded border border-blue-200">${topicName}</span>
+                  <span class="text-[10px] font-semibold bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded">${diffText}</span>
+                </div>
+                <p class="font-bold text-slate-900 text-sm">${index + 1}. ${q.text}</p>
+              </div>
+              <div class="space-x-1 flex text-xs shrink-0">
+                <button onclick="app.moveCustomQuestion(${index}, -1)" class="px-2 py-0.5 border rounded hover:bg-slate-100">▲</button>
+                <button onclick="app.moveCustomQuestion(${index}, 1)" class="px-2 py-0.5 border rounded hover:bg-slate-100">▼</button>
+                <button onclick="app.deleteCustomQuestion(${index})" class="px-2 py-0.5 border border-red-200 text-red-600 rounded hover:bg-red-50">Delete</button>
+              </div>
+            </div>
+            <p class="text-slate-600 font-mono">Options: ${q.options.map((o) => `${o.id}: ${o.text}`).join(' | ')}</p>
+            <p class="text-slate-500">Correct: <span class="font-bold text-slate-800">Option ${q.correct_option_id}</span> ${q.explanation ? `| Explanation: ${q.explanation}` : ''}</p>
           </div>
-        </div>
-        <p class="text-slate-600 font-mono">Options: ${q.options.map((o) => `${o.id}: ${o.text}`).join(' | ')}</p>
-        <p class="text-slate-500">Correct: <span class="font-bold text-slate-800">Option ${q.correct_option_id}</span> ${q.explanation ? `| Explanation: ${q.explanation}` : ''}</p>
-      </div>
-    `
-      )
+        `;
+      })
       .join('');
   }
 
