@@ -230,6 +230,18 @@ class AptiApp {
     this.showScreen('editor');
   }
 
+  handleTopicSelectChange(selectEl, targetContainerId) {
+    const container = document.getElementById(targetContainerId);
+    if (!container) return;
+    if (selectEl.value === 'custom') {
+      container.classList.remove('hidden');
+      const input = container.querySelector('input');
+      if (input) input.focus();
+    } else {
+      container.classList.add('hidden');
+    }
+  }
+
   addCustomQuestion() {
     const text = document.getElementById('new-q-text').value.trim();
     const qImage = document.getElementById('new-q-image')?.value.trim() || '';
@@ -243,7 +255,10 @@ class AptiApp {
     const optDImg = document.getElementById('new-opt-d-img')?.value.trim() || '';
     const correct = document.getElementById('new-correct-opt').value;
     const explanation = document.getElementById('new-explanation').value.trim();
-    const topic = document.getElementById('new-q-topic')?.value || 'quantitative';
+    
+    const topicSelect = document.getElementById('new-q-topic')?.value || 'quantitative';
+    const customTopicInput = document.getElementById('new-q-custom-topic')?.value.trim();
+    const topic = (topicSelect === 'custom' && customTopicInput) ? customTopicInput : (topicSelect === 'custom' ? 'Custom Topic' : topicSelect);
     const difficulty = document.getElementById('new-q-difficulty')?.value || 'medium';
 
     if (!text || text.length < 5) {
@@ -1338,18 +1353,29 @@ class AptiApp {
       // Topic strengths progress bars
       const topicContainer = document.getElementById('results-topic-bars');
       if (topicContainer && s.topicStrengths) {
+        const topicLabels = {
+          quantitative: 'Quantitative Aptitude',
+          logical: 'Logical Reasoning',
+          verbal: 'Verbal Reasoning',
+          data_interpretation: 'Data Interpretation',
+          general_knowledge: 'General Knowledge & CS',
+        };
+
         topicContainer.innerHTML = Object.entries(s.topicStrengths)
-          .map(([tName, tData]) => `
-            <div class="space-y-1">
-              <div class="flex justify-between font-semibold text-slate-700 capitalize">
-                <span>${tName.replace('_', ' ')}</span>
-                <span>${tData.correct}/${tData.total} (${tData.pct}%)</span>
+          .map(([tName, tData]) => {
+            const displayName = topicLabels[tName.toLowerCase()] || tName.split(/[_\s]+/).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+            return `
+              <div class="space-y-1">
+                <div class="flex justify-between font-semibold text-slate-700">
+                  <span>${displayName}</span>
+                  <span>${tData.correct}/${tData.total} (${tData.pct}%)</span>
+                </div>
+                <div class="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
+                  <div class="bg-blue-900 h-full rounded-full" style="width: ${tData.pct}%"></div>
+                </div>
               </div>
-              <div class="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden">
-                <div class="bg-blue-900 h-full rounded-full" style="width: ${tData.pct}%"></div>
-              </div>
-            </div>
-          `)
+            `;
+          })
           .join('');
       }
     }

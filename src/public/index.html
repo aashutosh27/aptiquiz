@@ -219,12 +219,13 @@
           <div class="grid grid-cols-3 gap-2">
             <div>
               <label class="block text-xs font-bold uppercase text-slate-700">Category Topic</label>
-              <select id="new-q-topic" class="w-full border border-slate-300 p-2 rounded text-sm bg-white font-medium">
+              <select id="new-q-topic" onchange="app.handleTopicSelectChange(this, 'new-q-custom-topic-container')" class="w-full border border-slate-300 p-2 rounded text-sm bg-white font-medium">
                 <option value="quantitative">Quantitative Aptitude</option>
                 <option value="logical">Logical Reasoning</option>
                 <option value="verbal">Verbal Reasoning</option>
                 <option value="data_interpretation">Data Interpretation</option>
                 <option value="general_knowledge">General Knowledge & CS</option>
+                <option value="custom">✏️ Custom / Write-in Topic...</option>
               </select>
             </div>
             <div>
@@ -244,6 +245,11 @@
                 <option value="D">Option D</option>
               </select>
             </div>
+          </div>
+
+          <div id="new-q-custom-topic-container" class="hidden">
+            <label class="block text-xs font-bold uppercase text-blue-900">Custom Category / Topic Name</label>
+            <input id="new-q-custom-topic" type="text" placeholder="Type custom topic name (e.g. Python, Operating Systems, DBMS...)" class="w-full border border-blue-300 p-2 rounded text-sm bg-blue-50/50 font-medium mt-1">
           </div>
           
           <div class="grid grid-cols-2 gap-2">
@@ -287,12 +293,16 @@
           <div class="grid grid-cols-3 gap-2">
             <div>
               <label class="block text-xs font-semibold text-slate-700">Category</label>
-              <select id="editor-ai-topic" class="w-full border border-slate-300 p-2 rounded text-sm bg-white">
+              <select id="editor-ai-topic" onchange="app.handleTopicSelectChange(this, 'editor-ai-custom-topic-container')" class="w-full border border-slate-300 p-2 rounded text-sm bg-white">
                 <option value="quantitative">Quantitative</option>
                 <option value="logical">Logical Reasoning</option>
                 <option value="verbal">Verbal Reasoning</option>
                 <option value="data_interpretation">Data Interpretation</option>
+                <option value="custom">✏️ Custom / Write-in Topic...</option>
               </select>
+              <div id="editor-ai-custom-topic-container" class="hidden mt-1">
+                <input id="editor-ai-custom-category-input" type="text" placeholder="Type custom category..." class="w-full border border-slate-300 p-1.5 rounded text-xs bg-white">
+              </div>
             </div>
             <div>
               <label class="block text-xs font-semibold text-slate-700">Difficulty</label>
