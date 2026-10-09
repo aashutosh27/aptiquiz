@@ -514,10 +514,18 @@ class AptiApp {
   }
 
   refreshRoomUI() {
-    if (this.currentRoom) {
-      const roomId = this.currentRoom.roomId || this.currentRoom.id;
-      const pin = this.currentRoom.pin;
-      const existingCode = this.currentRoom.proctorCode;
+    let roomId = this.currentRoom?.roomId || this.currentRoom?.id;
+    let pin = this.currentRoom?.pin;
+
+    if (!pin) {
+      const specPin = document.getElementById('spec-pin')?.innerText?.trim();
+      if (specPin && specPin !== '------') {
+        pin = specPin;
+      }
+    }
+
+    if ((roomId || pin) && this.socket) {
+      const existingCode = this.currentRoom?.proctorCode;
       this.socket.emit('room:rejoin', { roomId, pin }, (res) => {
         if (res && res.success && res.snapshot) {
           this.currentRoom = res.snapshot;
@@ -565,20 +573,31 @@ class AptiApp {
   // --- SPECTATOR / PROJECTOR MODE DASHBOARD ---
   openSpectatorMode(pin) {
     this.showScreen('spectator');
-    document.getElementById('spec-pin').innerText = pin || '------';
+    if (pin) {
+      const pinEl = document.getElementById('spec-pin');
+      if (pinEl) pinEl.innerText = pin;
+    }
 
     if (!this.socket) this.initSocket();
 
-    if (pin && this.socket) {
-      this.socket.emit('room:join', { pin, isSpectator: true }, (res) => {
-        if (res && res.success && res.snapshot) {
-          this.currentRoom = res.snapshot;
-          this.renderSpectatorDashboard();
-        } else if (res && res.error) {
-          this.showError(res.error.message || 'Failed to join as Spectator.');
-          this.showScreen(this.user ? 'join' : 'signin');
-        }
-      });
+    const executeJoin = () => {
+      if (pin && this.socket) {
+        this.socket.emit('room:join', { pin, isSpectator: true }, (res) => {
+          if (res && res.success && res.snapshot) {
+            this.currentRoom = res.snapshot;
+            this.renderSpectatorDashboard();
+          } else if (res && res.error) {
+            this.showError(res.error.message || 'Failed to join as Spectator.');
+            this.showScreen(this.user ? 'join' : 'signin');
+          }
+        });
+      }
+    };
+
+    if (this.socket.connected) {
+      executeJoin();
+    } else {
+      this.socket.once('connect', executeJoin);
     }
   }
 
@@ -690,26 +709,6 @@ class AptiApp {
       const ms = Number(valMs);
       this.socket.emit('host:update_settings', { questionDurationMs: ms });
       alert(`Question duration set to ${ms / 1000} seconds per question.`);
-    }
-  }
-
-  // --- SPECTATOR / PROJECTOR MODE DASHBOARD ---
-  openSpectatorMode(pin) {
-    this.showScreen('spectator');
-    document.getElementById('spec-pin').innerText = pin || '------';
-    document.getElementById('spec-link').innerText = `${window.location.origin}/j/${pin}`;
-
-    if (window.QRCode && pin) {
-      QRCode.render(document.getElementById('spec-qrcode'), `${window.location.origin}/j/${pin}`);
-    }
-
-    if (pin && this.socket) {
-      this.socket.emit('room:join', { pin, isSpectator: true }, (res) => {
-        if (res && res.error) {
-          this.showError(res.error.message || 'Failed to join as Spectator.');
-          this.showScreen(this.user ? 'join' : 'signin');
-        }
-      });
     }
   }
 
