@@ -1218,6 +1218,67 @@ class AptiApp {
     });
   }
 
+  // --- AUDIO SYNTHESIS & SOUND EFFECTS ENGINE ---
+  playToneSequence(notes) {
+    if (!this.soundEnabled) return;
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      if (!this.audioCtx) this.audioCtx = new AudioCtx();
+      if (this.audioCtx.state === 'suspended') {
+        this.audioCtx.resume();
+      }
+
+      const now = this.audioCtx.currentTime;
+      notes.forEach((n) => {
+        const osc = this.audioCtx.createOscillator();
+        const gain = this.audioCtx.createGain();
+
+        osc.type = n.type || 'sine';
+        osc.frequency.setValueAtTime(n.freq, now + (n.delay || 0));
+
+        const start = now + (n.delay || 0);
+        const dur = (n.durMs || 150) / 1000;
+        const volume = n.vol || 0.12;
+
+        gain.gain.setValueAtTime(volume, start);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+
+        osc.connect(gain);
+        gain.connect(this.audioCtx.destination);
+
+        osc.start(start);
+        osc.stop(start + dur);
+      });
+    } catch (e) {}
+  }
+
+  playCorrectSound() {
+    // Pleasant two-note ascending chime: E5 (659Hz) -> C6 (1046Hz)
+    this.playToneSequence([
+      { freq: 659, delay: 0, durMs: 120, vol: 0.12, type: 'sine' },
+      { freq: 1046, delay: 0.1, durMs: 220, vol: 0.15, type: 'sine' }
+    ]);
+  }
+
+  playWrongSound() {
+    // Gentle low two-note minor tone: 220Hz -> 165Hz
+    this.playToneSequence([
+      { freq: 220, delay: 0, durMs: 120, vol: 0.1, type: 'triangle' },
+      { freq: 165, delay: 0.1, durMs: 220, vol: 0.12, type: 'triangle' }
+    ]);
+  }
+
+  playVictorySound() {
+    // Celebratory C-major fanfare arpeggio for Rank #1 winner: C5 -> E5 -> G5 -> C6
+    this.playToneSequence([
+      { freq: 523, delay: 0, durMs: 150, vol: 0.15, type: 'triangle' },
+      { freq: 659, delay: 0.12, durMs: 150, vol: 0.15, type: 'triangle' },
+      { freq: 784, delay: 0.24, durMs: 180, vol: 0.18, type: 'triangle' },
+      { freq: 1046, delay: 0.40, durMs: 550, vol: 0.22, type: 'sine' }
+    ]);
+  }
+
   renderReveal(data) {
     // Show reveal inline on question screen WITHOUT full-screen transition!
     if (typeof data.newTotalScore === 'number') {
@@ -1232,9 +1293,11 @@ class AptiApp {
 
     if (inlineContainer && inlineText) {
       if (data.isCorrect) {
+        this.playCorrectSound();
         inlineContainer.className = 'p-4 rounded-lg border bg-emerald-50 border-emerald-300 text-emerald-950 my-3 text-left';
         inlineText.innerText = `✓ Correct! +${data.pointsEarned || 0} points. Answered in ${((data.adjustedTimeMs || 0) / 1000).toFixed(1)} seconds.`;
       } else {
+        this.playWrongSound();
         inlineContainer.className = 'p-4 rounded-lg border bg-rose-50 border-rose-300 text-rose-950 my-3 text-left';
         inlineText.innerText = `✗ Incorrect or time expired. Correct answer: Option ${data.correctOptionId}`;
       }
@@ -1380,8 +1443,16 @@ class AptiApp {
       }
     }
 
-    // Render final rankings table
+    // Render final rankings table & play victory sound if current player is Rank #1
     if (summary.fullRankings) {
+      if (summary.fullRankings.length > 0) {
+        const winner = summary.fullRankings[0];
+        const isWinner = this.user && Number(winner.userId) === Number(this.user.id);
+        if (isWinner) {
+          this.playVictorySound();
+        }
+      }
+
       const body = document.getElementById('results-body');
       if (body) {
         body.innerHTML = summary.fullRankings
@@ -1425,7 +1496,11 @@ class AptiApp {
 
   toggleSound() {
     this.soundEnabled = !this.soundEnabled;
-    document.getElementById('btn-sound-toggle').innerText = `Sound: ${this.soundEnabled ? 'ON' : 'OFF'}`;
+    const btn = document.getElementById('btn-sound-toggle');
+    if (btn) btn.innerText = `Sound: ${this.soundEnabled ? 'ON' : 'OFF'}`;
+    if (this.soundEnabled) {
+      this.playCorrectSound();
+    }
   }
 
   async requestAiQuestionsFromEditor() {
