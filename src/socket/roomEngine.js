@@ -202,6 +202,7 @@ export class Room {
     return {
       roomId: this.id,
       pin: this.pin,
+      hostId: this.hostId,
       proctorCode: this.proctorCode,
       inviteToken: this.inviteToken,
       status: this.status,

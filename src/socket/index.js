@@ -103,6 +103,10 @@ export function setupSocketIO(server) {
         throw new AppError('ROOM_NOT_FOUND');
       }
 
+      let player = null;
+      let isHost = false;
+      let takeover = false;
+
       if (parsed.isSpectator) {
         const specCount = room.getActiveSpectatorCount(socket.id);
         if (specCount >= 2) {
@@ -110,15 +114,18 @@ export function setupSocketIO(server) {
         }
         room.addActiveSpectator(socket.id);
         socket.isSpectator = true;
+      } else {
+        room.checkCanJoin(socket.user, !!parsed.inviteToken);
+
+        const res = room.addPlayer(
+          socket.user,
+          socket.id,
+          !socket.user.email
+        );
+        player = res.player;
+        isHost = res.isHost;
+        takeover = res.takeover;
       }
-
-      room.checkCanJoin(socket.user, !!parsed.inviteToken);
-
-      const { player, isHost, takeover } = room.addPlayer(
-        socket.user,
-        socket.id,
-        !socket.user.email
-      );
 
       currentRoom = room;
       socket.join(`room_${room.id}`);
@@ -132,7 +139,7 @@ export function setupSocketIO(server) {
       }
 
       // Broadcast join/rejoin to room for student players
-      if (!isHost && player) {
+      if (!isHost && !socket.isSpectator && player) {
         io.to(`room_${room.id}`).emit('room:player_joined', {
           userId: player.userId,
           displayName: player.displayName,
@@ -493,6 +500,13 @@ async function triggerRoundEnd(room, io) {
       let summary;
       await room.queue.enqueue(async () => {
         summary = room.calculateFinalSummary();
+      });
+
+      io.to(`room_${room.id}`).emit('game:finished', {
+        summary: {
+          top10: summary.top10,
+          fullRankings: summary.fullRankings,
+        },
       });
 
       for (const player of room.players.values()) {
